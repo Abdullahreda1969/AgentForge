@@ -51,32 +51,21 @@ class AgentForgeOrchestrator:
         
         if not os.path.exists(project_dir):
             os.makedirs(project_dir)
-            logger.info(f"📁 تم إنشاء مجلد المشروع: {project_dir}")
-        
+
         for file_name, task in self.project_state["structure"].items():
             success = False
             attempts = 0
-            feedback = "" # التغذية الراجعة التي سنرسلها للمبرمج
+            feedback = ""
             
             while attempts < 3 and not success:
                 attempts += 1
                 logger.info(f"📝 جاري كتابة {file_name} (محاولة {attempts})...")
                 
-                # إرسال التغذية الراجعة للمبرمج إذا وجدت
-                # 1. تأكد أن task عبارة عن نص (String) حتى لو جاء من المعماري كقائمة
                 current_task = " ".join(task) if isinstance(task, list) else task
-
-                # 2. أضف التغذية الراجعة فقط إذا كانت موجودة
                 if feedback:
                     current_task += f"\n\n[CRITICAL FEEDBACK]: {feedback}"
 
-                # 3. أرسل النص الصافي والمنظم للمبرمج
-                code = self.coder.write_code(
-                    file_name, 
-                    self.project_state["description"], 
-                    current_task
-                )
-                
+                code = self.coder.write_code(file_name, self.project_state["description"], current_task)
                 is_valid, error_msg = self.tester.validate_code(code)
                 
                 if is_valid:
@@ -86,22 +75,40 @@ class AgentForgeOrchestrator:
                     if file_name.endswith(".py"):
                         run_ok, run_output = self.executor.execute_code(file_path)
                         
-                        # تحليل ذكي للمخرج: هل المخرج يوحي بالفشل؟
-                        failure_keywords = ["error", "failed", "could not", "none", "exception"]
+                        failure_keywords = ["error", "failed", "could not", "none", "exception", "timed out"]
                         is_logic_error = any(word in run_output.lower() for word in failure_keywords)
 
                         if run_ok and not is_logic_error:
                             logger.info(f"✅ نجاح كامل! المخرج: {run_output.strip()}")
                             success = True
                         else:
-                            feedback = f"Runtime Output: {run_output}. Please fix the logic to ensure it works correctly."
-                            logger.warning(f"⚠️ فشل منطقي أو برمي، إعادة المحاولة... المخرج: {run_output.strip()}")
+                            feedback = f"Runtime Issue: {run_output}"
+                            logger.warning(f"⚠️ فشل في التشغيل، إعادة المحاولة...")
                     else:
                         success = True
                 else:
                     feedback = f"Syntax Error: {error_msg}"
                     logger.warning(f"❌ خطأ في القواعد، إعادة المحاولة...")
-                    
+
+            # --- نظام تقرير الأعطال الجديد ---
+            # --- نظام تقرير الأعطال المصحح ---
+            if not success:
+                report_path = os.path.join(project_dir, "CRASH_REPORT.md")
+                # استخدمنا علامات تنصيص مفردة لتجنب أي تداخل
+                report_content = f'''# ⚠️ تقرير عطل فني: {file_name}
+## حالة النظام: فشل بعد {attempts} محاولات
+
+## آخر مخرج من النظام:
+{feedback}
+
+## التحليل المقترح:
+1. تأكد من توفر اتصال بالإنترنت.
+2. تأكد من توافق المكتبات.
+3. إذا كان الخطأ Timed Out، فقد يحتاج الكود لتبسيط العمليات.
+'''
+                self._save_file(report_path, report_content)
+                logger.error(f"📁 تم إنشاء تقرير العطل في: {report_path}")
+
     def _save_file(self, path, content):
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)

@@ -2,10 +2,10 @@ from agentforge.core.orchestrator import AgentForgeOrchestrator
 
 def main():
     af = AgentForgeOrchestrator()
-    # لنطلب منه بناء أداة بسيطة لحساب العملات أو جلب سعر الذهب مثلاً
+    # طلب مشروع يحتاج مكتبة غير مثبتة (python-weather)
     state = af.start_cycle(
-        project_name="GoldTracker", 
-        description="A script that gets real-time gold price using a mock API and saves it to a file",
+        project_name="BitcoinPriceChecker", 
+        description="Create a python script that uses the requests library to get the current price of Bitcoin from Coingecko API and prints it.",
         lang="python"
     )
     print(f"\n✅ الحالة النهائية: {state['status']}")

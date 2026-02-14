@@ -9,7 +9,15 @@ class CoderAgent:
         # إضافة إعدادات الـ API لضمان التوافق مع v1beta
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.model_id = "models/gemma-3-1b-it" 
-        self.system_prompt = "You are a professional Python coder. Respond ONLY with clean code."
+        # تحديث الـ System Prompt ليكون أكثر إصراراً على الحلول الحقيقية
+        self.system_prompt = """
+        You are an expert Python Engineer. 
+        CRITICAL RULES:
+        1. Use REAL, public, and reliable APIs or libraries (like yfinance, requests, or BeautifulSoup).
+        2. DO NOT use fake URLs like 'mock-api.com'.
+        3. If you need a financial data, use a known free library.
+        4. Return ONLY the code.
+        """
 
     def write_code(self, file_name, project_desc, task_details):
         full_prompt = (
