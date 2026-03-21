@@ -47,3 +47,8 @@ Successfully generated **GoldTracker**, a project that went through 3 iterations
  شغل التطبيق
 powershell
 streamlit run app_gui.py
+
+**روابط المشروع:**
+- GitHub: https://github.com/Abdullahreda1969/AgentForge
+
+
