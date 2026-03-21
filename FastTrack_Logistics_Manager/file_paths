@@ -1,0 +1,101 @@
+import tkinter as tk
+import json
+import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class ShippingManagementApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Shipping Management")
+
+        self.data = []
+        self.data_file = "data.json"
+
+        # Initialize data
+        self.load_data()
+
+        # Create widgets
+        self.label = tk.Label(root, text="Shipments:")
+        self.label.pack(pady=10)
+
+        self.entry = tk.Entry(root, width=40)
+        self.entry.pack(pady=5)
+
+        self.add_button = tk.Button(root, text="Add Shipment", command=self.add_shipment)
+        self.add_button.pack(pady=5)
+
+        self.delete_button = tk.Button(root, text="Delete Shipment", command=self.delete_shipment)
+        self.delete_button.pack(pady=5)
+
+        self.status_label = tk.Label(root, text="Status:")
+        self.status_label.pack(pady=5)
+
+        self.status_var = tk.StringVar()
+        self.status_label.config(text="Status:")
+        self.status_label.pack(pady=5)
+
+        self.shipment_list = ttk.Treeview(root, columns=("Tracking ID", "Sender", "Receiver", "Weight", "Status"), show="headings")
+        self.shipment_list.pack(pady=10)
+        self.shipment_list.bind("<Button-1>", self.select_shipment)
+
+        self.update_listbox()
+
+    def load_data(self):
+        try:
+            with open(self.data_file, 'r') as f:
+                self.data = json.load(f)
+        except FileNotFoundError:
+            self.data = []
+            logging.warning(f"Data file not found: {self.data_file}")
+        except json.JSONDecodeError:
+            logging.error(f"Error decoding JSON: {self.data_file}")
+            self.data = []
+
+    def update_listbox(self):
+        self.shipment_list.delete(0, tk.END)
+        for item in self.data:
+            self.shipment_list.insert(tk.END, f"{item['Tracking ID']}: {item['Sender']} - {item['Receiver']} (Weight: {item['Weight']})")
+
+    def add_shipment(self):
+        tracking_id = self.entry.get()
+        if tracking_id in self.data:
+            return
+        self.data.append({"Tracking ID": tracking_id, "Sender": "User", "Receiver": "User", "Weight": 10, "Status": "Pending"})
+        self.update_listbox()
+
+    def delete_shipment(self):
+        try:
+            tracking_id = self.entry.get()
+            if tracking_id in self.data:
+                del self.data[tracking_id]
+                self.update_listbox()
+        except:
+            logging.error("Invalid Tracking ID")
+
+    def select_shipment(self, event):
+        try:
+            tracking_id = self.entry.get()
+            if tracking_id in self.data:
+                self.update_listbox()
+            else:
+                self.entry.delete(0, tk.END)
+        except:
+            self.entry.delete(0, tk.END)
+
+    def update_listbox(self):
+        self.shipment_list.update(0, tk.END)
+
+    def save_data(self):
+        try:
+            with open(self.data_file, 'w') as f:
+                json.dump(self.data, f, indent=4)
+        except Exception as e:
+            logging.error(f"Error saving data: {e}")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ShippingManagementApp(root)
+    root.mainloop()

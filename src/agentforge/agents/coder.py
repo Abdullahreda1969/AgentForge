@@ -17,25 +17,38 @@ class CoderAgent:
         2. DO NOT use fake URLs like 'mock-api.com'.
         3. If you need a financial data, use a known free library.
         4. Return ONLY the code.
+        "رد بالكود المصدري فقط، بدون أي شرح أو علامات Markdown إضافية."
         """
+        
 
-    def write_code(self, file_name, project_desc, task_details):
+    def write_code(self, file_name, project_desc, task_details, history=None):
+        """
+        history: قائمة تحتوي على محاولات الفشل السابقة وردود فعل المراجع.
+        """
+        # تجهيز سياق الذاكرة
+        history_context = ""
+        if history and len(history) > 0:
+            history_context = "\n\n⚠️ MEMORY: Previous attempts for this file failed. Learn from these logs:\n"
+            for idx, entry in enumerate(history, 1):
+                history_context += f"Attempt {idx}: {entry}\n"
+            history_context += "\nFix the issues mentioned above and do not repeat the same mistakes."
+
         full_prompt = (
             f"{self.system_prompt}\n"
             f"File to write: {file_name}\n"
             f"Project Context: {project_desc}\n"
             f"Task Details: {task_details}\n"
-            "Important: If there is feedback about errors, fix them. If an API fails, try an alternative way or use a robust mock."
+            f"{history_context}\n"
+            "Important: Return the COMPLETE improved code."
         )
         
+        # داخل ملف coder.py
         try:
-            # استخدام config لضمان عدم حدوث تعارض مع الموديلات التجريبية
             response = self.client.models.generate_content(
                 model=self.model_id,
                 contents=full_prompt
             )
             return response.text.replace('```python', '').replace('```', '').strip()
         except Exception as e:
-            # طباعة الخطأ كاملاً لنعرف إذا كان هناك Rate Limit
-            print(f"⚠️ Error: {e}")
-            return f"# Error in generating {file_name}"
+            print(f"⚠️ API Error: {e}")
+            raise e # 🛑 نرفع الخطأ للأوركسترا بدل إرجاع نص وهمي

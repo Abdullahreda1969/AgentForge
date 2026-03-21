@@ -4,24 +4,22 @@ import os
 class Reviewer:
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model_id = "gemini-2.0-flash" # أو gemma-3-1b-it حسب تفضيلك
+        self.model_id = "models/gemma-3-1b-it" # أو gemma-3-1b-it حسب تفضيلك
 
-    def review_code(self, code, original_task):
+    
+        # تأكد من إضافة history=None في تعريف الدالة
+    def review_code(self, code, task, history=None): 
+        """يراجع الكود بناءً على المهمة وتاريخ المحاولات السابقة"""
+        
         prompt = f"""
-        أنت الآن 'مراقب جودة برمجية' (Senior Code Reviewer). 
-        المهمة الأصلية كانت: {original_task}
-        الكود الذي كتبه المبرمج هو:
-        ---
-        {code}
-        ---
-        قم بتحليل الكود وابحث عن:
-        1. هل جميع الأزرار مرتبطة بدوال (Missing commands)?
-        2. هل الدوال تحتوي على منطق حقيقي أم مجرد 'pass'?
-        3. هل هناك مكتبات مستخدمة لم يتم استيرادها (Import errors)?
-        4. هل يلتزم الكود بأفضل الممارسات؟
+        أنت مراجع كود خبير. 
+        المهمة: {task}
 
-        إذا كان الكود ممتازاً، ابدأ ردك بكلمة 'PASS'.
-        إذا كان هناك أخطاء، ابدأ بكلمة 'FAIL' ثم اذكر الأخطاء بدقة ليتمكن المبرمج من إصلاحها.
+        قواعد صارمة للمراجعة:
+        1. إذا كان المشروع واجهة رسومية (GUI/Tkinter)، يمنع منعاً باتاً استخدام `input()` أو `print()` لجلب البيانات أو عرض النتائج.
+        2. يجب استخدام `Entry.get()` لجلب البيانات و `label.config()` أو `messagebox` لعرض النتائج.
+        3. إذا وجدت `input()` في كود GUI، رد بـ "FAIL: يمنع استخدام input في تطبيقات الواجهات".
+        4. إذا كان الكود سليماً ومنطقياً، رد بـ "PASS".
         """
         
         response = self.client.models.generate_content(

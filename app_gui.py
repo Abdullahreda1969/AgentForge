@@ -104,12 +104,17 @@ if st.button("إطلاق عملية الصهر (Forge)"):
                 for i, file in enumerate(files):
                     with tabs[i]:
                         file_path = os.path.join(project_name, file)
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            content = f.read()
-                            if file.endswith(".py"):
-                                st.code(content, language="python")
-                            else:
-                                st.markdown(content)
+                        
+                        # 🛡️ إضافة فحص: هل هذا مسار لملف حقيقي أم مجلد؟
+                        if os.path.isfile(file_path):
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+                                if file.endswith(".py"):
+                                    st.code(content, language="python")
+                                else:
+                                    st.text(content)
+                        else:
+                            st.info(f"📁 هذا المسار عبارة عن مجلد: {file}")
             else:
                 status.update(label="❌ حدث خطأ أثناء البناء", state="error")
                 st.error("راجع الـ Logs في التيرمينال لمعرفة التفاصيل.")

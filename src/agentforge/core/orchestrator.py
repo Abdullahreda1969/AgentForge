@@ -68,10 +68,10 @@ class AgentForgeOrchestrator:
         logger.info(f"✅ تم تحديد {len(structure)} ملفات للبناء.")
     
 
-    def _run_architect_phase(self):
-        logger.info("🏗️  المرحلة 1: تصميم الهيكل...")
-        structure = self.architect.analyze_project(self.project_state["description"], self.project_state["language"])
-        self.project_state["structure"] = structure
+    # def _run_architect_phase(self):
+    #     logger.info("🏗️  المرحلة 1: تصميم الهيكل...")
+    #     structure = self.architect.analyze_project(self.project_state["description"], self.project_state["language"])
+    #     self.project_state["structure"] = structure
 
     def _run_coding_phase(self):
         logger.info("💻 المرحلة 2: البرمجة والتدقيق مع التصحيح الذاتي...")
@@ -80,6 +80,17 @@ class AgentForgeOrchestrator:
         if not os.path.exists(project_dir):
             os.makedirs(project_dir)
 
+        # --- [إضافة: جلب القواعد الخارجية من ملف gui_rules.md] ---
+        external_rules = ""
+        if os.path.exists("gui_rules.md"):
+            try:
+                with open("gui_rules.md", "r", encoding="utf-8") as f:
+                    external_rules = f"\n\n### EXTERNAL STANDARDS (gui_rules.md) ###\n{f.read()}"
+                logger.info("📖 تم تحميل معايير GUI بنجاح من gui_rules.md")
+            except Exception as e:
+                logger.warning(f"⚠️ تعذر قراءة ملف gui_rules.md: {e}")
+        # -------------------------------------------------------
+
         max_retries = self.project_state.get("max_attempts", 3)
         should_execute = self.project_state.get("auto_run", True)
 
@@ -87,66 +98,101 @@ class AgentForgeOrchestrator:
             success = False
             attempts = 0
             feedback = ""
-            
+            history = []  # 🧠 ذاكرة المحاولات لهذا الملف
+
             while attempts < max_retries and not success:
-                attempts += 1
-                logger.info(f"📝 جاري كتابة {file_name} (محاولة {attempts})...")
-                
-                current_task = " ".join(task) if isinstance(task, list) else task
-                if feedback:
-                    current_task += f"\n\n[CRITICAL FEEDBACK]: {feedback}"
+                try:
+                    attempts += 1
+                    logger.info(f"📝 محاولة برمجة {file_name} رقم ({attempts})...")
+                    
+                    # 1. صياغة المهمة واستدعاء المبرمج
+                    current_task = " ".join(task) if isinstance(task, list) else task
+                    
+                    # 🚀 --- [تحديث: دمج القواعد التقنية الثابتة مع الخارجية] ---
+                    technical_rules = (
+                        "\n\n### MANDATORY TECHNICAL RULES ###\n"
+                        "1. NO INTERACTION via terminal: strictly NO input() for GUI logic.\n"
+                        "2. SCOPE SAFETY: Define 'root = tk.Tk()' inside main() and before widgets.\n"
+                        "3. GUI UPDATES: Use label.config(text=...) to show results in the window.\n"
+                        "4. ERROR HANDLING: Wrap network/API calls in try-except blocks.\n"
+                        "5. VISIBILITY: Use 'root.lift()' and 'root.mainloop()' correctly.\n"
+                        "6. LIBRARIES: Only use standard tkinter/ttk unless requested.\n"
+                    )
+                    
+                    # دمج القواعد التقنية الصارمة + القواعد الخارجية من الملف
+                    enhanced_task = f"{current_task}\n{technical_rules}\n{external_rules}"
+                    # -------------------------------------------------------
 
-                # 1. المبرمج يكتب الكود
-                code = self.coder.write_code(file_name, self.project_state["description"], current_task)
+                    short_history = history[-2:] if len(history) > 2 else history
 
-                # --- 🔍 بداية مرحلة المراجعة (Review Phase) الجديدة ---
-                logger.info(f"🧐 مراجعة الكود لـ {file_name} بواسطة الوكيل المراجع...")
-                review_result = self.reviewer.review_code(code, current_task)
-                
-                if "FAIL" in review_result.upper():
-                    feedback = f"Reviewer Rejection: {review_result}"
-                    logger.warning(f"⚠️ المراجع رفض الكود في {file_name}. السبب: {review_result[:100]}...")
-                    continue # العودة لبداية الحلقة لإعادة الكتابة بناءً على نقد المراجع
-                
-                logger.info(f"✅ المراجع أعطى الضوء الأخضر لـ {file_name}.")
-                # --- 🔍 نهاية مرحلة المراجعة ---
+                    code = self.coder.write_code(
+                        file_name, 
+                        self.project_state["description"], 
+                        enhanced_task, 
+                        history=short_history
+                    )
 
-                # 2. فحص القواعد النحوية (Syntax)
-                is_valid, error_msg = self.tester.validate_code(code)
-                
-                if is_valid:
+                    # 2. المراجعة المنطقية
+                    logger.info("⏳ انتظار بسيط لتهدئة الـ API قبل المراجعة...")
+                    time.sleep(5) 
+                    
+                    review_result = self.reviewer.review_code(code, enhanced_task, history=short_history)
+                    
+                    if review_result.strip().upper().startswith("FAIL"):                            
+                        feedback = review_result
+                        history.append(f"Attempt {attempts} - Review Fail: {feedback}")
+                        logger.warning(f"⚠️ المراجع رفض المنطق في {file_name}. المحاولة القادمة ستكون أذكى.")
+                        continue 
+
+                    # 3. الفحص النحوي (Syntax Test)
+                    is_valid, error_msg = self.tester.validate_code(code)
+                    if not is_valid:
+                        feedback = error_msg
+                        history.append(f"Attempt {attempts} - Syntax Error: {error_msg}")
+                        logger.warning(f"❌ خطأ سنتاكس في {file_name}، جاري إعادة المحاولة...")
+                        continue
+
+                    # 4. الحفظ المؤقت للفحص التشغيلي
                     file_path = os.path.join(project_dir, file_name)
                     self._save_file(file_path, code)
-                    
+                    logger.info(f"✅ الكود سليم نحوياً لـ {file_name}")
+
+                    # 5. اختبار التشغيل الفعلي (Execution)
                     if file_name.endswith(".py") and should_execute:
-                        logger.info(f"🔍 جاري اختبار تشغيل {file_name}...")
                         run_ok, run_output = self.executor.execute_code(file_path)
                         
-                        # تحليل النتائج
-                        failure_keywords = ["error", "failed", "exception", "timed out"]
-                        is_logic_error = any(word in run_output.lower() for word in failure_keywords)
+                        failure_keywords = ["error", "failed", "exception", "traceback", "nameerror", "attributeerror"]
+                        has_runtime_error = any(word in run_output.lower() for word in failure_keywords)
 
-                        if run_ok and not is_logic_error:
-                            logger.info(f"✅ نجاح التشغيل والاختبار!")
+                        if run_ok and not has_runtime_error:
+                            logger.info(f"🎉 نجاح التشغيل والاختبار النهائي لـ {file_name}!")
                             success = True
                         else:
-                            feedback = f"Runtime Issue: {run_output}"
-                            logger.warning(f"⚠️ فشل في الاختبار الفعلي، إعادة المحاولة...")
+                            feedback = run_output
+                            history.append(f"Attempt {attempts} - Runtime Error: {run_output}")
+                            logger.warning(f"⚠️ فشل التشغيل لـ {file_name}، جاري محاولة الإصلاح...")
+                            continue
                     else:
                         logger.info(f"✅ تم حفظ {file_name} بنجاح.")
                         success = True
-                else:
-                    feedback = f"Syntax Error: {error_msg}"
-                    logger.warning(f"❌ خطأ في القواعد، إعادة المحاولة...")
 
+                except Exception as e:
+                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                        logger.warning(f"🕒 تم بلوغ حد الطلبات (Quota). سأنتظر 60 ثانية...")
+                        time.sleep(60) 
+                        attempts -= 1 
+                        continue
+                    else:
+                        logger.error(f"🚨 خطأ نظام غير متوقع: {str(e)}")
+                        raise e
+
+            # 6. معالجة الفشل النهائي (لا تدخل هنا إلا إذا فشلت كل المحاولات)
             if not success:
-                report_path = os.path.join(project_dir, "CRASH_REPORT.md")
-                
-                # الحصول على الوقت والتاريخ الحالي بتنسيق مقروء
+                # تعريف المتغيرات هنا حصراً لتجنب UnboundLocalError
                 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                report_path = os.path.join(project_dir, f"CRASH_REPORT_{file_name}.md")
                 
                 crash_content = f"""# ⚠️ تقرير عطل في الملف: {file_name}
-                
     ## 📅 معلومات التوقيت
     - **التاريخ والوقت:** {now}
 
@@ -157,14 +203,24 @@ class AgentForgeOrchestrator:
     ## ❌ آخر تغذية راجعة (Feedback)
     ```text
     {feedback}
-    تم إنشاء هذا التقرير تلقائياً بواسطة AgentForge v1.0.0
-    """
-    self._save_file(report_path, crash_content)
-    
-    logger.error(f"📁 تم إنشاء تقرير العطل المفصل في {file_name}.")
+    تم إنشاء هذا التقرير تلقائياً بواسطة AI Engine v0.4.2"""
 
+                self._save_file(report_path, crash_content)
+                logger.error(f"📁 تم إنشاء تقرير العطل في {report_path}")
+        
+        # نخرج من حلقة الملفات ونعيد True بنجاح تام
+        return True
 
 
     def _save_file(self, path, content):
+        # الحصول على مسار المجلد الذي يحتوي على الملف
+        directory = os.path.dirname(path)
+        
+        # إذا كان هناك مجلد في المسار وغير موجود، قم بإنشائه
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+            logger.info(f"📂 تم إنشاء المجلد المفقود تلقائياً: {directory}")
+
+        # الآن نحفظ الملف بأمان
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
