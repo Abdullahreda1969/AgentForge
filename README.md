@@ -44,9 +44,6 @@ Successfully generated **GoldTracker**, a project that went through 3 iterations
 
 ## 🚀 البدء في الاستخدام
 
-1. قم بضبط مفتاح الـ API في ملف `.env`.
-2. قم بتشغيل الواجهة الرئيسية عبر Streamlit:
-
-   ```bash
-   streamlit run main_app.py
-   ```
+ شغل التطبيق
+powershell
+streamlit run app_gui.py
