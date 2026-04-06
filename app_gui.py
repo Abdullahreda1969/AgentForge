@@ -3,59 +3,45 @@ import os
 import sys
 import shutil
 
-# --- إضافة هذا الجزء للتأكد من رؤية المجلدات ---
+# --- إعداد المسارات لضمان رؤية المجلدات في السحابة ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 src_path = os.path.join(current_dir, "src")
 if src_path not in sys.path:
     sys.path.append(src_path)
-# -------------------------------------------
 
 from agentforge.core.orchestrator import AgentForgeOrchestrator
 
 def create_zip(project_name):
-    """ضغط مجلد المشروع بالكامل لضمان الهيكلية الصحيحة"""
-    # المسار الفعلي للمشروع داخل مجلد projects
-    project_path = os.path.join("projects", project_name)
+    """إنشاء ملف ZIP احترافي باسم المشروع داخل مجلد projects"""
+    # المسار الفعلي للمجلد الذي أنشأه الوكلاء
+    source_path = os.path.join("projects", project_name)
+    # اسم ملف الـ ZIP النهائي
+    zip_name = project_name
     
-    # التأكد من وجود المجلد قبل الضغط
-    if os.path.exists(project_path):
-        shutil.make_archive(project_name, 'zip', project_path)
-    else:
-        # إذا كان المشروع في المجلد الرئيسي مباشرة (fallback)
-        shutil.make_archive(project_name, 'zip', project_name)
-        
-    return f"{project_name}.zip"
-# إضافة مسار src لضمان عمل الاستيراد بشكل صحيح
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+    if os.path.exists(source_path):
+        # ضغط المجلد (سيتم إنشاء ملف باسم project_name.zip في المجلد الرئيسي للتحميل)
+        shutil.make_archive(zip_name, 'zip', source_path)
+        return f"{zip_name}.zip"
+    return None
 
-# إعدادات الصفحة (تظهر بشكل رائع على الموبايل)
+# إعدادات الصفحة
 st.set_page_config(
     page_title="AgentForge AI",
     page_icon="🚀",
     layout="centered"
 )
 
-# --- القائمة الجانبية للإعدادات ---
+# القائمة الجانبية
 st.sidebar.header("⚙️ إعدادات المحرك")
-
-# خيار التشغيل التلقائي
-auto_run = st.sidebar.checkbox("تشغيل الكود تلقائياً (Auto-Run)", value=True, 
-                               help="إذا تم تفعيله، سيحاول المحرك تشغيل الكود للتأكد من خلوه من الأخطاء المنطقية.")
-
-# خيار تثبيت المكتبات
-auto_install = st.sidebar.checkbox("تثبيت المكتبات المفقودة", value=True,
-                                   help="تفعيل ميزة pip install التلقائية في حال وجود مكتبات ناقصة.")
-
-# عدد محاولات التصحيح
+auto_run = st.sidebar.checkbox("تشغيل الكود تلقائياً (Auto-Run)", value=True)
+auto_install = st.sidebar.checkbox("تثبيت المكتبات المفقودة", value=True)
 max_attempts = st.sidebar.slider("أقصى عدد لمحاولات التصحيح", 1, 5, 3)
-
 st.sidebar.markdown("---")
 st.sidebar.info(f"إصدار المحرك: v0.9.6 Stable")
 
-# التصميم الجمالي (CSS بسيط لتحسين المظهر)
+# التنسيق الجمالي
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
     .stButton>button { width: 100%; border-radius: 10px; height: 3em; background-color: #ff4b4b; color: white; }
     </style>
     """, unsafe_allow_html=True)
@@ -63,20 +49,21 @@ st.markdown("""
 st.title("🚀 AgentForge AI Engine")
 st.subheader("محرك بناء البرمجيات الذكي - v0.9.0")
 
-# صندوق المدخلات
-project_name = st.text_input("اسم المشروع", placeholder="مثلاً: CryptoTracker")
-project_desc = st.text_area("ماذا تريد أن تبني؟", placeholder="اكتب وصفاً تفصيلياً هنا...")
+project_name = st.text_input("اسم المشروع", placeholder="مثلاً: Pharmacy_System")
+project_desc = st.text_area("ماذا تريد أن تبني؟", placeholder="اكتب وصفاً تفصيلياً...")
 
 if st.button("إطلاق عملية الصهر (Forge)"):
     if project_name and project_desc:
+        # تنظيف اسم المشروع من المسافات لضمان سلامة الروابط والملفات
+        clean_name = project_name.replace(" ", "_")
+        
         with st.status("🛠️ جاري العمل على مشروعك...", expanded=True) as status:
             af = AgentForgeOrchestrator()
+            st.write(f"🏗️ بدأ المحرك في بناء {clean_name}...")
             
-            st.write(f"🏗️ بدأ المحرك في بناء {project_name}...")
-            
-            # استدعاء واحد فقط بجميع الإعدادات
+            # استدعاء واحد شامل للمحرك
             state = af.start_cycle(
-                project_name=project_name,
+                project_name=clean_name,
                 description=project_desc,
                 lang="python",
                 auto_run=auto_run,
@@ -85,32 +72,36 @@ if st.button("إطلاق عملية الصهر (Forge)"):
             
             if state.get("status") == "completed":
                 status.update(label="✅ تم الانجاز!", state="complete", expanded=False)
-                st.success(f"🎉 تم بناء المشروع: {project_name}")
+                st.success(f"🎉 تم بناء المشروع: {clean_name}")
                 
-                # إنشاء وتحميل الـ ZIP
-                zip_file = create_zip(project_name)
-                with open(zip_file, "rb") as fp:
-                    st.download_button(
-                        label="📥 تحميل المشروع كاملاً (ZIP)",
-                        data=fp,
-                        file_name=zip_file,
-                        mime="application/zip"
-                    )
+                # إنشاء الـ ZIP باسم المشروع
+                zip_file = create_zip(clean_name)
                 
-                # تبويبات المعاينة
-                st.info("📂 معاينة الملفات:")
-                # التأكد من وجود المجلد قبل قراءة الملفات
-                if os.path.exists(project_name):
-                    files = [f for f in os.listdir(project_name) if os.path.isfile(os.path.join(project_name, f))]
+                if zip_file and os.path.exists(zip_file):
+                    with open(zip_file, "rb") as fp:
+                        st.download_button(
+                            label=f"📥 تحميل {clean_name}.zip",
+                            data=fp,
+                            file_name=zip_file,
+                            mime="application/zip"
+                        )
+                
+                # معاينة الملفات
+                st.info("📂 معاينة الملفات المصهورة:")
+                project_full_path = os.path.join("projects", clean_name)
+                if os.path.exists(project_full_path):
+                    files = [f for f in os.listdir(project_full_path) if os.path.isfile(os.path.join(project_full_path, f))]
                     if files:
                         tabs = st.tabs(files)
                         for i, file in enumerate(files):
                             with tabs[i]:
-                                with open(os.path.join(project_name, file), "r", encoding="utf-8") as f:
+                                with open(os.path.join(project_full_path, file), "r", encoding="utf-8") as f:
                                     st.code(f.read(), language="python" if file.endswith(".py") else "text")
             else:
                 status.update(label="❌ فشلت المهمة", state="error")
-                st.error("المراجع رفض الكود أو حدث خطأ تقني.")
-# تذييل الصفحة
+                st.error("المراجع رفض الكود. راجع التفاصيل في Logs.")
+    else:
+        st.warning("رجاءً أدخل اسم المشروع ووصفه!")
+
 st.markdown("---")
 st.caption("صُنع بكل حب بواسطة AgentForge & Gemini - 2026")
