@@ -1,20 +1,28 @@
-# تجاهل ملفات البيئة الافتراضية
+# --- Python Environment ---
 venv/
+.venv/
+env/
 .env
-
-# تجاهل ملفات بايثون المؤقتة
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# تجاهل المشاريع التي ينشئها المحرك (لكي لا تزدحم الشيفرة الأصلية)
-EasyNotepad/
-SmartBMI/
-# أو يمكنك استخدام هذا السطر لتجاهل أي مجلد مشروع جديد مستقبلاً:
-# */ 
+# --- AgentForge Projects (The Generated Content) ---
+# هذا السطر سيتجاهل أي مجلد داخل مجلد projects ليبقى المحرك نظيفاً
+projects/*
+# استثناء ملف .gitkeep إذا كنت تريد بقاء المجلد فارغاً على GitHub
+!projects/.gitkeep
 
-# تجاهل ملفات الضغط والتحميل
-*.zip
-
-# تجاهل ملفات النظام
+# --- IDE & System Files ---
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
+*.log
+
+# --- Data & Temp Files ---
+*.db
+*.csv
+*.json
+!gui_rules.md  # تأكد من عدم تجاهل ملف القواعد لأنه جزء من المحرك

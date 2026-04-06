@@ -75,21 +75,21 @@ class AgentForgeOrchestrator:
 
     def _run_coding_phase(self):
         logger.info("💻 المرحلة 2: البرمجة والتدقيق مع التصحيح الذاتي...")
-        project_dir = self.project_state["name"]
+        
+        project_dir = os.path.join(os.getcwd(), "projects", self.project_state["name"])
         
         if not os.path.exists(project_dir):
-            os.makedirs(project_dir)
+            os.makedirs(project_dir, exist_ok=True)
+            logger.info(f"📂 تم إنشاء مستودع المشروع في: {project_dir}")
 
-        # --- [إضافة: جلب القواعد الخارجية من ملف gui_rules.md] ---
+        # جلب القواعد الخارجية
         external_rules = ""
         if os.path.exists("gui_rules.md"):
             try:
                 with open("gui_rules.md", "r", encoding="utf-8") as f:
                     external_rules = f"\n\n### EXTERNAL STANDARDS (gui_rules.md) ###\n{f.read()}"
-                logger.info("📖 تم تحميل معايير GUI بنجاح من gui_rules.md")
             except Exception as e:
                 logger.warning(f"⚠️ تعذر قراءة ملف gui_rules.md: {e}")
-        # -------------------------------------------------------
 
         max_retries = self.project_state.get("max_attempts", 3)
         should_execute = self.project_state.get("auto_run", True)
@@ -97,18 +97,16 @@ class AgentForgeOrchestrator:
         for file_name, task in self.project_state["structure"].items():
             success = False
             attempts = 0
-            feedback = ""
-            history = []  # 🧠 ذاكرة المحاولات لهذا الملف
+            history = []
 
             while attempts < max_retries and not success:
                 try:
                     attempts += 1
                     logger.info(f"📝 محاولة برمجة {file_name} رقم ({attempts})...")
                     
-                    # 1. صياغة المهمة واستدعاء المبرمج
                     current_task = " ".join(task) if isinstance(task, list) else task
                     
-                    # 🚀 --- [تحديث: دمج القواعد التقنية الثابتة مع الخارجية] ---
+                    # 1. القواعد التقنية (الموجودة سابقاً)
                     technical_rules = (
                         "\n\n### MANDATORY TECHNICAL RULES ###\n"
                         "1. NO INTERACTION via terminal: strictly NO input() for GUI logic.\n"
@@ -116,21 +114,32 @@ class AgentForgeOrchestrator:
                         "3. GUI UPDATES: Use label.config(text=...) to show results in the window.\n"
                         "4. ERROR HANDLING: Wrap network/API calls in try-except blocks.\n"
                         "5. VISIBILITY: Use 'root.lift()' and 'root.mainloop()' correctly.\n"
-                        "6. LIBRARIES: Only use standard tkinter/ttk unless requested.\n"
+                    )
+
+                    # 🌟 2. إضافة تعليمات الجودة الاحترافية (الجديدة) 🌟
+                    quality_standards = (
+                        "\n### PROFESSIONAL STANDARDS ###\n"
+                        "- ROBUSTNESS: Use try-except blocks for all file/network operations.\n"
+                        "- CLEAN CODE: Add meaningful comments for complex logic.\n"
+                        "- PORTABILITY: Use 'os.path.join' for paths, NEVER hardcode 'C:\\' paths.\n"
+                        "- LOGGING: Include print() statements to log major app events to console.\n"
+                        "- REQUIREMENTS: If you use external libraries, use their standard names.\n"
                     )
                     
-                    # دمج القواعد التقنية الصارمة + القواعد الخارجية من الملف
-                    enhanced_task = f"{current_task}\n{technical_rules}\n{external_rules}"
-                    # -------------------------------------------------------
+                    # دمج كل شيء في مهمة واحدة معززة
+                    enhanced_task = f"{current_task}\n{technical_rules}\n{quality_standards}\n{external_rules}"
 
                     short_history = history[-2:] if len(history) > 2 else history
 
+                    # استدعاء المبرمج بالمهمة المعززة
                     code = self.coder.write_code(
                         file_name, 
                         self.project_state["description"], 
                         enhanced_task, 
                         history=short_history
                     )
+
+                    # ... (بقية الكود الخاص بالمراجعة والفحص والتشغيل كما هو)
 
                     # 2. المراجعة المنطقية
                     logger.info("⏳ انتظار بسيط لتهدئة الـ API قبل المراجعة...")
@@ -208,19 +217,79 @@ class AgentForgeOrchestrator:
                 self._save_file(report_path, crash_content)
                 logger.error(f"📁 تم إنشاء تقرير العطل في {report_path}")
         
+        # --- [إضافة احترافية: توليد ملف تشغيل ذكي start_app.bat] ---
+        bat_content = """@echo off
+title Launching Smart Project...
+echo 🚀 Checking environment...
+
+if not exist venv (
+    echo 📦 Creating virtual environment...
+    python -m venv venv
+)
+
+echo 🔗 Activating environment...
+call venv\\Scripts\\activate
+
+if exist requirements.txt (
+    echo 📥 Installing/Updating dependencies...
+    pip install -r requirements.txt
+)
+
+echo ⚡ Starting Application...
+python main.py
+pause
+"""
+        bat_path = os.path.join(project_dir, "start_app.bat")
+        with open(bat_path, "w", encoding="utf-8") as f:
+            f.write(bat_content)
+            
+        logger.info(f"💾 تم إنشاء ملف التشغيل السريع: {bat_path}")
+        # -------------------------------------------------------
+        
+        # --- [إضافة احترافية: توليد ملف requirements.txt تلقائياً] ---
+        # نقوم بمسح كافة ملفات البايثون التي تم إنشاؤها لجمع المكتبات المستخدمة
+        all_imports = set()
+        for root_dir, _, files in os.walk(project_dir):
+            for file in files:
+                if file.endswith(".py"):
+                    try:
+                        with open(os.path.join(root_dir, file), "r", encoding="utf-8") as f:
+                            for line in f:
+                                line = line.strip()
+                                if line.startswith("import ") or line.startswith("from "):
+                                    # استخراج اسم المكتبة الأساسي (مثلاً من from pandas.api نأخذ pandas)
+                                    parts = line.split()
+                                    if len(parts) > 1:
+                                        mod = parts[1].split('.')[0]
+                                        all_imports.add(mod)
+                    except Exception as e:
+                        logger.warning(f"⚠️ تعذر قراءة الملف {file} لاستخراج التبعيات: {e}")
+        
+        # تصفية المكتبات القياسية (الموجودة مسبقاً في بايثون)
+        standard_libs = [
+            "os", "sys", "time", "datetime", "math", "tkinter", "json", 
+            "shutil", "sqlite3", "logging", "subprocess", "re", "random"
+        ]
+        external_libs = [lib for lib in all_imports if lib and lib not in standard_libs]
+        
+        # إذا وجدنا مكتبات خارجية، نكتبها في ملف requirements.txt
+        if external_libs:
+            req_path = os.path.join(project_dir, "requirements.txt")
+            with open(req_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(external_libs))
+            logger.info(f"📦 تم تحديث requirements.txt بالمكتبات: {external_libs}")
+        
         # نخرج من حلقة الملفات ونعيد True بنجاح تام
         return True
 
 
     def _save_file(self, path, content):
-        # الحصول على مسار المجلد الذي يحتوي على الملف
+        # التأكد من أن المسار كامل (Absolute Path) لتجنب الحفظ في المكان الخطأ
         directory = os.path.dirname(path)
         
-        # إذا كان هناك مجلد في المسار وغير موجود، قم بإنشائه
         if directory and not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
-            logger.info(f"📂 تم إنشاء المجلد المفقود تلقائياً: {directory}")
+            logger.info(f"📂 إنشاء مسار فرعي: {directory}")
 
-        # الآن نحفظ الملف بأمان
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)

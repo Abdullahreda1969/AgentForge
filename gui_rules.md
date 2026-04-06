@@ -1,48 +1,25 @@
-# AgentForge Master Template v1.9 (FORCE-INJECT)
+# AgentForge Professional GUI Standards (v2.0)
 
-import tkinter as tk
-from tkinter import ttk, messagebox
-import json, os
+### 1. ARCHITECTURE REQUIREMENTS
 
-class BaseApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("FastTrack Logistics v1.9")
-        self.root.geometry("800x600")
-        self.root.configure(bg='#121212')
-        self.data_file = 'data.json'
-        self.data = self.load_data()
-        self.setup_ui()
+- ALWAYS separate the UI layout from the data logic.
+- DATA PERSISTENCE: Use JSON or SQLite for saving data.
+- Path Handling: Use `os.path.join` for all file paths.
 
-    def load_data(self):
-        if os.path.exists(self.data_file):
-            try:
-                with open(self.data_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except: return []
-        return []
+### 2. UI/UX STANDARDS (Tkinter)
 
-    def save_data(self):
-        with open(self.data_file, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, ensure_ascii=False, indent=4)
+- THEME: Use dark mode colors (Bg: #121212, Fg: #FFFFFF, Accent: #00FF00).
+- WIDGETS: Use `ttk.Treeview` for tables and `ttk.Style` for a modern look.
+- RESPONSIVENESS: Use `pack(fill='both', expand=True)` or `grid` with proper weights.
 
-    def setup_ui(self):
-        # Header
-        tk.Label(self.root, text="FASTTRACK LOGISTICS", fg='#00ff00', bg='#121212', font=('Arial', 18, 'bold')).pack(pady=20)
-        
-        # Treeview Style
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("Treeview", background="#222222", foreground="white", fieldbackground="#222222", borderwidth=0)
-        style.map("Treeview", background=[('selected', '#00ff00')], foreground=[('selected', 'black')])
+### 3. FUNCTIONALITY RULES (STRICT)
 
-        # Table
-        self.tree = ttk.Treeview(self.root, columns=('ID', 'Sender', 'Receiver', 'Status'), show='headings')
-        for col in ('ID', 'Sender', 'Receiver', 'Status'): self.tree.heading(col, text=col)
-        self.tree.pack(fill='both', expand=True, padx=20)
+- **NO PLACEHOLDERS:** Buttons MUST NOT use `print("Ready")`. They must open a dialog or execute a function.
+- **INPUT VALIDATION:** Always check if Entry fields are empty before saving.
+- **FEEDBACK:** Use `messagebox.showinfo` or `messagebox.showerror` to talk to the user.
 
-        # Controls
-        btn_frame = tk.Frame(self.root, bg='#121212')
-        btn_frame.pack(pady=20)
-        tk.Button(btn_frame, text="ADD SHIPMENT", fg='white', bg='#333333', width=15, command=lambda: print("Ready")).pack(side='left', padx=10)
-        
+### 4. CODE QUALITY
+
+- NO `input()` calls.
+- NO hardcoded usernames or local paths.
+- Ensure all imports are at the top of the file.

@@ -34,7 +34,6 @@ Successfully generated **GoldTracker**, a project that went through 3 iterations
 
 4.  **Executor & Tester Agent:** يقوم بتشغيل الكود في بيئة معزولة واختبار سلامته النحوية والوظيفية.
 
-
 ## ✨ المميزات الجديدة في الإصدار 1.0.0
 
 - **التحقق المنطقي:** لن يتم قبول الكود الذي يحتوي على دوال فارغة أو أزرار غير مفعلة.
@@ -44,11 +43,12 @@ Successfully generated **GoldTracker**, a project that went through 3 iterations
 
 ## 🚀 البدء في الاستخدام
 
- شغل التطبيق
+شغل التطبيق
 powershell
 streamlit run app_gui.py
 
 **روابط المشروع:**
+
 - GitHub: https://github.com/Abdullahreda1969/AgentForge
 
-
+  https://agentforge-hqcxp8yt6mdtyjubdbbvsx.streamlit.app

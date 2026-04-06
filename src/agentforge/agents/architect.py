@@ -12,33 +12,61 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class ArchitectAgent:
+    # ... (الجزء العلوي من الملف كما هو) ...
+
     def __init__(self):
-        # إعداد العميل (Client)
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.model_id = "models/gemma-3-1b-it"
+        # 1. تحديث الـ System Prompt ليكون أكثر صرامة واحترافية
         self.system_prompt = """
-        You are an expert Software Architect. 
-        Analyze the project and respond ONLY with a valid JSON object.
-        Keys: file paths. Values: brief tasks for that file.
-        Example: {"main.py": "Entry point that starts the app"}
+        You are a Senior Software Architect. Your goal is to design a clean, modular directory structure for Python projects.
+
+        STRICT DESIGN RULES:
+
+        MODULARITY: Separate GUI logic from data processing.
+
+        DOCUMENTATION: Always include a README.md with setup instructions.
+
+        DEPENDENCIES: Always plan for a requirements.txt file.
+
+        NAMING: Use snake_case for filenames and PascalCase for Classes.
+
+        ENTRY POINT: Ensure there is a clear main.py to launch the application.
         """
 
     def design_project(self, name, description):
         """يستلم الوصف ويعيد هيكل الملفات كقاموس (Dictionary)"""
-        logger.info(f"🧠 المصمم يفكر في هيكل مشروع: {name}...")
+        logger.info(f"🧠 المصمم الاحترافي يخطط لمشروع: {name}...")
         
         full_prompt = f"{self.system_prompt}\n\nProject Name: {name}\nDescription: {description}"
         
         try:
-            # استخدام مكتبة genai الجديدة بشكل صحيح
             response = self.client.models.generate_content(
                 model=self.model_id,
                 contents=full_prompt
             )
-            return self._parse_json_response(response.text)
+            
+            # تحويل النص إلى قاموس
+            structure = self._parse_json_response(response.text)
+            
+            # 2. ضمان وجود الملفات الاحترافية (Safety Check)
+            # إذا نسي الذكاء الاصطناعي أياً منها، نقوم بإضافتها يدوياً هنا
+            if "requirements.txt" not in structure:
+                structure["requirements.txt"] = "List of all external libraries used in the project."
+            if "README.md" not in structure:
+                structure["README.md"] = f"Technical documentation and setup guide for {name}."
+            if "main.py" not in structure:
+                structure["main.py"] = "The main execution script to start the application."
+                
+            return structure
+
         except Exception as e:
             logger.error(f"❌ خطأ في تواصل المصمم: {e}")
-            return {"main.py": "Primary script"}
+            return {
+                "main.py": "Primary script",
+                "requirements.txt": "dependencies",
+                "README.md": "documentation"
+            }
 
     def _parse_json_response(self, text):
         """دالة مساعدة لتنظيف النص وتحويله إلى JSON"""
