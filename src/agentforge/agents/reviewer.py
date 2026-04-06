@@ -34,6 +34,9 @@ class Reviewer:
         ⚠️ RESPONSE FORMAT:
         - Start with 'PASS' ONLY if the code is 100% production-ready and fulfills the TASK.
         - Start with 'FAIL' followed by a detailed technical report in English for the Coder to fix.
+        
+        9. JSON VALIDITY: FAIL if any .json file created is empty or contains invalid syntax. Every JSON must start with [] or {}.
+        
         """
         
         try:

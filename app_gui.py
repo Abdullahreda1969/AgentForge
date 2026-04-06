@@ -13,10 +13,18 @@ if src_path not in sys.path:
 from agentforge.core.orchestrator import AgentForgeOrchestrator
 
 def create_zip(project_name):
-    """ضغط المجلد لسهولة التحميل"""
-    shutil.make_archive(project_name, 'zip', project_name)
+    """ضغط مجلد المشروع بالكامل لضمان الهيكلية الصحيحة"""
+    # المسار الفعلي للمشروع داخل مجلد projects
+    project_path = os.path.join("projects", project_name)
+    
+    # التأكد من وجود المجلد قبل الضغط
+    if os.path.exists(project_path):
+        shutil.make_archive(project_name, 'zip', project_path)
+    else:
+        # إذا كان المشروع في المجلد الرئيسي مباشرة (fallback)
+        shutil.make_archive(project_name, 'zip', project_name)
+        
     return f"{project_name}.zip"
-
 # إضافة مسار src لضمان عمل الاستيراد بشكل صحيح
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
@@ -64,31 +72,23 @@ if st.button("إطلاق عملية الصهر (Forge)"):
         with st.status("🛠️ جاري العمل على مشروعك...", expanded=True) as status:
             af = AgentForgeOrchestrator()
             
-            # هنا نمرر الإعدادات المختارة من الواجهة
+            st.write(f"🏗️ بدأ المحرك في بناء {project_name}...")
+            
+            # استدعاء واحد فقط بجميع الإعدادات
             state = af.start_cycle(
                 project_name=project_name,
                 description=project_desc,
                 lang="python",
-                auto_run=auto_run,        # ميزة جديدة
-                max_attempts=max_attempts # ميزة جديدة
+                auto_run=auto_run,
+                max_attempts=max_attempts
             )
             
-            st.write(f"🏗️ بناء الهيكل لمشروع {project_name}...")
-            # تشغيل الدورة البرمجية
-            state = af.start_cycle(
-                project_name=project_name,
-                description=project_desc,
-                lang="python"
-            )
-            
-            if state["status"] == "completed":
+            if state.get("status") == "completed":
                 status.update(label="✅ تم الانجاز!", state="complete", expanded=False)
                 st.success(f"🎉 تم بناء المشروع: {project_name}")
                 
-                # إنشاء ملف الـ ZIP
+                # إنشاء وتحميل الـ ZIP
                 zip_file = create_zip(project_name)
-                
-                # زر التحميل (سيظهر بشكل رائع على الموبايل)
                 with open(zip_file, "rb") as fp:
                     st.download_button(
                         label="📥 تحميل المشروع كاملاً (ZIP)",
@@ -96,31 +96,21 @@ if st.button("إطلاق عملية الصهر (Forge)"):
                         file_name=zip_file,
                         mime="application/zip"
                     )
-                st.info("📂 معاينة الملفات:")
-                # إضافة تبويبات لعرض الملفات
-                files = os.listdir(project_name)
-                tabs = st.tabs(files)
                 
-                for i, file in enumerate(files):
-                    with tabs[i]:
-                        file_path = os.path.join(project_name, file)
-                        
-                        # 🛡️ إضافة فحص: هل هذا مسار لملف حقيقي أم مجلد؟
-                        if os.path.isfile(file_path):
-                            with open(file_path, "r", encoding="utf-8") as f:
-                                content = f.read()
-                                if file.endswith(".py"):
-                                    st.code(content, language="python")
-                                else:
-                                    st.text(content)
-                        else:
-                            st.info(f"📁 هذا المسار عبارة عن مجلد: {file}")
+                # تبويبات المعاينة
+                st.info("📂 معاينة الملفات:")
+                # التأكد من وجود المجلد قبل قراءة الملفات
+                if os.path.exists(project_name):
+                    files = [f for f in os.listdir(project_name) if os.path.isfile(os.path.join(project_name, f))]
+                    if files:
+                        tabs = st.tabs(files)
+                        for i, file in enumerate(files):
+                            with tabs[i]:
+                                with open(os.path.join(project_name, file), "r", encoding="utf-8") as f:
+                                    st.code(f.read(), language="python" if file.endswith(".py") else "text")
             else:
-                status.update(label="❌ حدث خطأ أثناء البناء", state="error")
-                st.error("راجع الـ Logs في التيرمينال لمعرفة التفاصيل.")
-    else:
-        st.warning("رجاءً أدخل اسم المشروع ووصفه أولاً!")
-
+                status.update(label="❌ فشلت المهمة", state="error")
+                st.error("المراجع رفض الكود أو حدث خطأ تقني.")
 # تذييل الصفحة
 st.markdown("---")
 st.caption("صُنع بكل حب بواسطة AgentForge & Gemini - 2026")
