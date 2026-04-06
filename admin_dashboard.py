@@ -2,6 +2,8 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import plotly.express as px
+import os
+import shutil
 
 st.set_page_config(page_title="AgentForge Admin", layout="wide", page_icon="🛡️")
 
@@ -49,27 +51,50 @@ if not data.empty:
 st.markdown("---")
 
 # 📦 3. قسم تحميل المشاريع (الجديد والمثير!)
-st.subheader("📦 مركز تسليم المشاريع (Download Center)")
-if not data.empty:
-    # نختار فقط المشاريع الناجحة للتحميل
-    completed_projects = data[data['status'].str.contains('Completed', na=False)]['project'].unique()
-    
-    if len(completed_projects) > 0:
-        col_sel, col_btn = st.columns([3, 1])
-        with col_sel:
-            selected_project = st.selectbox("اختر المشروع الذي ترغب في تحميله كملف ZIP:", completed_projects)
-        with col_btn:
-            st.write("") # للموازنة البصرية
-            st.write("") 
-            # رابط التحميل يوجه مباشرة إلى الـ API الذي أنشأناه في الخطوة السابقة
-            download_url = f"http://127.0.0.1:8000/download/{selected_project}"
-            st.link_button(f"🚀 تحميل {selected_project}", download_url)
-    else:
-        st.info("لا توجد مشاريع مكتملة للتحميل بعد.")
-else:
-    st.warning("قاعدة البيانات فارغة حالياً.")
+# --- استبدل قسم "3. قسم تحميل المشاريع" بهذا الكود المطور ---
 
-st.markdown("---")
+st.subheader("📦 مركز تسليم المشاريع (Download Center)")
+
+# 1. فحص مجلد projects الفعلي في السيرفر (سواء سحابي أو محلي)
+projects_dir = "projects"
+if not os.path.exists(projects_dir):
+    os.makedirs(projects_dir)
+
+# جلب أسماء المجلدات الموجودة فعلياً وتجاهل الملفات المخفية
+actual_projects = [d for d in os.listdir(projects_dir) 
+                   if os.path.isdir(os.path.join(projects_dir, d)) and not d.startswith('.')]
+
+if actual_projects:
+    col_sel, col_btn = st.columns([3, 1])
+    with col_sel:
+        # عرض المشاريع الموجودة فعلياً في المجلد
+        selected_project = st.selectbox("اختر المشروع المتاح حالياً في السيرفر:", actual_projects)
+    
+    with col_btn:
+        st.write("") # موازنة
+        st.write("") 
+        
+        # 2. إنشاء ملف ZIP للمشروع المختار "أونلاين" للتحميل المباشر
+        import shutil
+        zip_path = f"{selected_project}.zip"
+        source_dir = os.path.join(projects_dir, selected_project)
+        
+        if os.path.exists(source_dir):
+            shutil.make_archive(selected_project, 'zip', source_dir)
+            
+            with open(zip_path, "rb") as rb:
+                st.download_button(
+                    label=f"🚀 تحميل {selected_project}",
+                    data=rb,
+                    file_name=f"{selected_project}.zip",
+                    mime="application/zip"
+                )
+else:
+    st.info("لا توجد مشاريع منشأة في المجلد حالياً. قم بإنشاء مشروع من واجهة Forge أولاً.")
+
+# إضافة زر تحديث يدوي قوي
+if st.sidebar.button("🔄 تحديث القائمة فوراً"):
+    st.rerun()
 
 # 📋 4. سجل المهام التفصيلي
 st.subheader("📋 سجل المهام التفصيلي")
