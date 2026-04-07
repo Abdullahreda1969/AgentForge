@@ -5,16 +5,18 @@ import plotly.express as px
 import os
 import shutil
 
+from st_gsheets_connection import GSheetsConnection
+
+
 st.set_page_config(page_title="AgentForge Admin", layout="wide", page_icon="🛡️")
 
 st.title("🛡️ لوحة تحكم مدير AgentForge")
 st.markdown("---")
 
 def get_admin_data():
-    conn = sqlite3.connect('agentforge_tasks.db')
-    # جلب البيانات والتأكد من ترتيبها
-    df = pd.read_sql_query("SELECT * FROM tasks ORDER BY created_at DESC", conn)
-    conn.close()
+    # إنشاء اتصال بجدول بيانات جوجل (يتم ضبط الرابط في Secrets)
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df = conn.read(ttl="10m") # تحديث البيانات كل 10 دقائق
     return df
 
 data = get_admin_data()

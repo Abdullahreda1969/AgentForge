@@ -4,3 +4,6 @@ python-dotenv
 pandas
 requests
 plotly
+gspread
+google-auth
+st-gsheets-connection

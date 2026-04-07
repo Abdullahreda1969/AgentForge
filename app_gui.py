@@ -2,6 +2,9 @@ import streamlit as st
 import os
 import sys
 import shutil
+import gspread # إضافة مكتبة الربط
+from google.oauth2.service_account import Credentials # إضافة مكتبة التصاريح
+from datetime import datetime # لإضافة الوقت والتاريخ
 
 # --- إعداد المسارات لضمان رؤية المجلدات في السحابة ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -11,25 +14,43 @@ if src_path not in sys.path:
 
 from agentforge.core.orchestrator import AgentForgeOrchestrator
 
+# 1️⃣ دالة تسجيل البيانات في Google Sheets (الإضافة الجديدة)
+def log_to_sheets(project_name, status, file_count, duration):
+    try:
+        # إعداد الصلاحيات (تأكد من وجود ملف credentials.json في المجلد الرئيسي)
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_file("credentials.json", scopes=scopes)
+        client = gspread.authorize(creds)
+        
+        # رابط الملف الخاص بك
+        sheet_url = "https://docs.google.com/spreadsheets/d/1gWF-LQ4MQqgUJx2GVbno_2BplQBGQBuU8goQBTT1Bl4/edit"
+        sheet = client.open_by_url(sheet_url).sheet1
+        
+        # تجهيز السطر (الاسم، الحالة، عدد الملفات، الوقت، التاريخ)
+        new_row = [
+            project_name, 
+            status, 
+            file_count, 
+            f"{duration}s", 
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ]
+        sheet.append_row(new_row)
+        return True
+    except Exception as e:
+        st.error(f"⚠️ فشل التسجيل في Google Sheets: {e}")
+        return False
+
 def create_zip(project_name):
     """إنشاء ملف ZIP احترافي باسم المشروع داخل مجلد projects"""
-    # المسار الفعلي للمجلد الذي أنشأه الوكلاء
     source_path = os.path.join("projects", project_name)
-    # اسم ملف الـ ZIP النهائي
     zip_name = project_name
-    
     if os.path.exists(source_path):
-        # ضغط المجلد (سيتم إنشاء ملف باسم project_name.zip في المجلد الرئيسي للتحميل)
         shutil.make_archive(zip_name, 'zip', source_path)
         return f"{zip_name}.zip"
     return None
 
 # إعدادات الصفحة
-st.set_page_config(
-    page_title="AgentForge AI",
-    page_icon="🚀",
-    layout="centered"
-)
+st.set_page_config(page_title="AgentForge AI", page_icon="🚀", layout="centered")
 
 # القائمة الجانبية
 st.sidebar.header("⚙️ إعدادات المحرك")
@@ -54,14 +75,12 @@ project_desc = st.text_area("ماذا تريد أن تبني؟", placeholder="ا
 
 if st.button("إطلاق عملية الصهر (Forge)"):
     if project_name and project_desc:
-        # تنظيف اسم المشروع من المسافات لضمان سلامة الروابط والملفات
         clean_name = project_name.replace(" ", "_")
         
         with st.status("🛠️ جاري العمل على مشروعك...", expanded=True) as status:
             af = AgentForgeOrchestrator()
             st.write(f"🏗️ بدأ المحرك في بناء {clean_name}...")
             
-            # استدعاء واحد شامل للمحرك
             state = af.start_cycle(
                 project_name=clean_name,
                 description=project_desc,
@@ -73,10 +92,13 @@ if st.button("إطلاق عملية الصهر (Forge)"):
             if state.get("status") == "completed":
                 status.update(label="✅ تم الانجاز!", state="complete", expanded=False)
                 st.success(f"🎉 تم بناء المشروع: {clean_name}")
+
+                # 2️⃣ استدعاء دالة التسجيل في Google Sheets فور النجاح (الإضافة الجديدة)
+                file_count = len(state.get("files", []))
+                duration = state.get("duration", 0)
+                log_to_sheets(clean_name, "Completed ✅", file_count, duration)
                 
-                # إنشاء الـ ZIP باسم المشروع
                 zip_file = create_zip(clean_name)
-                
                 if zip_file and os.path.exists(zip_file):
                     with open(zip_file, "rb") as fp:
                         st.download_button(
@@ -98,6 +120,8 @@ if st.button("إطلاق عملية الصهر (Forge)"):
                                 with open(os.path.join(project_full_path, file), "r", encoding="utf-8") as f:
                                     st.code(f.read(), language="python" if file.endswith(".py") else "text")
             else:
+                # تسجيل الفشل أيضاً (اختياري)
+                log_to_sheets(clean_name, "Failed ❌", 0, 0)
                 status.update(label="❌ فشلت المهمة", state="error")
                 st.error("المراجع رفض الكود. راجع التفاصيل في Logs.")
     else:
