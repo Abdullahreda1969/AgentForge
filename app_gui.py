@@ -17,16 +17,15 @@ from agentforge.core.orchestrator import AgentForgeOrchestrator
 # 1️⃣ دالة تسجيل البيانات في Google Sheets (الإضافة الجديدة)
 def log_to_sheets(project_name, status, file_count, duration):
     try:
-        # إعداد الصلاحيات (تأكد من وجود ملف credentials.json في المجلد الرئيسي)
+        # قراءة البيانات من Secrets السحابية بدلاً من ملف JSON محلي
+        creds_info = st.secrets["gcp_service_account"]
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-        creds = Credentials.from_service_account_file("credentials.json", scopes=scopes)
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
         client = gspread.authorize(creds)
         
-        # رابط الملف الخاص بك
         sheet_url = "https://docs.google.com/spreadsheets/d/1gWF-LQ4MQqgUJx2GVbno_2BplQBGQBuU8goQBTT1Bl4/edit"
         sheet = client.open_by_url(sheet_url).sheet1
         
-        # تجهيز السطر (الاسم، الحالة، عدد الملفات، الوقت، التاريخ)
         new_row = [
             project_name, 
             status, 
@@ -37,7 +36,12 @@ def log_to_sheets(project_name, status, file_count, duration):
         sheet.append_row(new_row)
         return True
     except Exception as e:
-        st.error(f"⚠️ فشل التسجيل في Google Sheets: {e}")
+        # إذا فشل السحابي (مثلاً أثناء التجربة المحلية)، جرب الملف المحلي
+        try:
+             creds = Credentials.from_service_account_file("credentials.json", scopes=["https://www.googleapis.com/auth/spreadsheets"])
+             # ... تكملة الكود للمحلي ...
+        except:
+             st.error(f"⚠️ فشل التسجيل: {e}")
         return False
 
 def create_zip(project_name):
@@ -92,6 +96,15 @@ if st.button("إطلاق عملية الصهر (Forge)"):
         with st.status("🛠️ جاري العمل على مشروعك...", expanded=True) as status:
             af = AgentForgeOrchestrator()
             st.write(f"🏗️ بدأ المحرك في بناء {clean_name}...")
+            
+            # تأكد أن هذا السطر موجود قبل تشغيل af.start_cycle
+            if not os.path.exists("projects"):
+                os.makedirs("projects")
+
+            # تأكد أن clean_name يُستخدم لإنشاء مجلد فرعي داخل projects
+            project_path = os.path.join("projects", clean_name)
+            if not os.path.exists(project_path):
+                os.makedirs(project_path)
             
             state = af.start_cycle(
                 project_name=clean_name,
