@@ -41,12 +41,24 @@ def log_to_sheets(project_name, status, file_count, duration):
         return False
 
 def create_zip(project_name):
-    """إنشاء ملف ZIP احترافي باسم المشروع داخل مجلد projects"""
-    source_path = os.path.join("projects", project_name)
-    zip_name = project_name
-    if os.path.exists(source_path):
-        shutil.make_archive(zip_name, 'zip', source_path)
-        return f"{zip_name}.zip"
+    """إنشاء ملف ZIP ونقله داخل مجلد projects لضمان التنظيم"""
+    source_dir = os.path.join("projects", project_name)
+    zip_filename = project_name # الاسم المؤقت للملف
+    target_zip_path = os.path.join("projects", f"{zip_filename}.zip") # المسار النهائي
+    
+    if os.path.exists(source_dir):
+        # 1. تنفيذ الضغط في المجلد الرئيسي مؤقتاً
+        shutil.make_archive(zip_filename, 'zip', source_dir)
+        
+        # 2. التأكد من حذف النسخة القديمة في مجلد projects (إن وجدت) لتجنب الخطأ
+        if os.path.exists(target_zip_path):
+            os.remove(target_zip_path)
+        
+        # 3. نقل ملف الـ ZIP الناتج ليكون داخل مجلد projects
+        shutil.move(f"{zip_filename}.zip", target_zip_path)
+        
+        # نرجع المسار الكامل للملف لكي يعرف زر التحميل أين يجده
+        return target_zip_path
     return None
 
 # إعدادات الصفحة
@@ -104,7 +116,7 @@ if st.button("إطلاق عملية الصهر (Forge)"):
                         st.download_button(
                             label=f"📥 تحميل {clean_name}.zip",
                             data=fp,
-                            file_name=zip_file,
+                            file_name=os.path.basename(zip_file), # يأخذ الاسم فقط للتحميل (Pharmacy_System.zip)
                             mime="application/zip"
                         )
                 
