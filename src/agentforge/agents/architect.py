@@ -12,11 +12,10 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class ArchitectAgent:
-    # ... (الجزء العلوي من الملف كما هو) ...
 
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model_id = "models/gemma-3-1b-it"
+        self.model_id = "gemini-1.5-flash"
         # 1. تحديث الـ System Prompt ليكون أكثر صرامة واحترافية
         self.system_prompt = """
         You are a Senior Software Architect. Your goal is to design a clean, modular directory structure for Python projects.
