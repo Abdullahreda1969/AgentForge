@@ -107,15 +107,14 @@ class AgentForgeOrchestrator:
                     current_task = " ".join(task) if isinstance(task, list) else task
                     
                     # 1. القواعد التقنية (الموجودة سابقاً)
+                    # ابحث عن technical_rules في orchestrator.py واستبدلها بـ:
                     technical_rules = (
-                        "\n\n### MANDATORY TECHNICAL RULES ###\n"
-                        "1. NO INTERACTION via terminal: strictly NO input() for GUI logic.\n"
-                        "2. SCOPE SAFETY: Define 'root = tk.Tk()' inside main() and before widgets.\n"
-                        "3. GUI UPDATES: Use label.config(text=...) to show results in the window.\n"
-                        "4. ERROR HANDLING: Wrap network/API calls in try-except blocks.\n"
-                        "5. VISIBILITY: Use 'root.lift()' and 'root.mainloop()' correctly.\n"
+                        "\n### GOLDEN ARCHITECTURE RULES ###\n"
+                        "1. REAL-TIME LOGIC: Use `root.after()` for any task that needs periodic updating (e.g., clocks, counters).\n"
+                        "2. NO BLOAT: If the user didn't ask for a button, don't write a button. Keep the UI surgical and clean.\n"
+                        "3. WINDOW STABILITY: Use `root.title()`, `root.geometry()`, and `root.mainloop()` correctly.\n"
+                        "4. NO TERMINAL: All outputs must appear on the GUI Label, never use input().\n"
                     )
-
                     # 🌟 2. إضافة تعليمات الجودة الاحترافية (الجديدة) 🌟
                     quality_standards = (
                         "\n### PROFESSIONAL STANDARDS ###\n"
@@ -127,8 +126,10 @@ class AgentForgeOrchestrator:
                     )
                     
                     # دمج كل شيء في مهمة واحدة معززة
-                    enhanced_task = f"{current_task}\n{technical_rules}\n{quality_standards}\n{external_rules}"
+                    # استبدل enhanced_task بهذا الهيكل الجديد:
+                    instruction_header = "🚨 CRITICAL ARCHITECTURE RULE: YOU MUST USE root.after() FOR RECURSIVE UPDATES. STATIC TIME IS A FAILURE. 🚨"
 
+                    enhanced_task = f"{instruction_header}\n\nTask: {current_task}\n{technical_rules}\n{quality_standards}"
                     short_history = history[-2:] if len(history) > 2 else history
 
                     # استدعاء المبرمج بالمهمة المعززة
@@ -202,43 +203,43 @@ class AgentForgeOrchestrator:
                 report_path = os.path.join(project_dir, f"CRASH_REPORT_{file_name}.md")
                 
                 crash_content = f"""# ⚠️ تقرير عطل في الملف: {file_name}
-    ## 📅 معلومات التوقيت
-    - **التاريخ والوقت:** {now}
+                ## 📅 معلومات التوقيت
+                - **التاريخ والوقت:** {now}
 
-    ## 🔍 حالة النظام عند الفشل
-    - **عدد المحاولات:** {attempts}
-    - **المهمة المطلوبة:** {current_task[:200]}...
+                ## 🔍 حالة النظام عند الفشل
+                - **عدد المحاولات:** {attempts}
+                - **المهمة المطلوبة:** {current_task[:200]}...
 
-    ## ❌ آخر تغذية راجعة (Feedback)
-    ```text
-    {feedback}
-    تم إنشاء هذا التقرير تلقائياً بواسطة AI Engine v0.4.2"""
+                ## ❌ آخر تغذية راجعة (Feedback)
+                ```text
+                {feedback}
+                تم إنشاء هذا التقرير تلقائياً بواسطة AI Engine v0.4.2"""
 
                 self._save_file(report_path, crash_content)
                 logger.error(f"📁 تم إنشاء تقرير العطل في {report_path}")
         
         # --- [إضافة احترافية: توليد ملف تشغيل ذكي start_app.bat] ---
         bat_content = """@echo off
-title Launching Smart Project...
-echo 🚀 Checking environment...
+        title Launching Smart Project...
+        echo 🚀 Checking environment...
 
-if not exist venv (
-    echo 📦 Creating virtual environment...
-    python -m venv venv
-)
+        if not exist venv (
+            echo 📦 Creating virtual environment...
+            python -m venv venv
+        )
 
-echo 🔗 Activating environment...
-call venv\\Scripts\\activate
+        echo 🔗 Activating environment...
+        call venv\\Scripts\\activate
 
-if exist requirements.txt (
-    echo 📥 Installing/Updating dependencies...
-    pip install -r requirements.txt
-)
+        if exist requirements.txt (
+            echo 📥 Installing/Updating dependencies...
+            pip install -r requirements.txt
+        )
 
-echo ⚡ Starting Application...
-python main.py
-pause
-"""
+        echo ⚡ Starting Application...
+        python main.py
+        pause
+        """
         bat_path = os.path.join(project_dir, "start_app.bat")
         with open(bat_path, "w", encoding="utf-8") as f:
             f.write(bat_content)

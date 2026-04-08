@@ -35,7 +35,9 @@ class Reviewer:
         7. README: FAIL if there is no English README.md with setup instructions.
         8. LANGUAGE: FAIL if comments or documentation are not in English.
         9. JSON VALIDITY: FAIL if any .json file created is empty or contains invalid syntax. Every JSON must start with [] or {{}}.
-
+        10. ANIMATION/UPDATE: FAIL if a time-based app is 'static'. It MUST have a refreshing mechanism (.after() or threading).
+        11. CLEAN REQUIREMENTS: FAIL if requirements.txt contains standard libraries like 'tkinter' or 'os'.
+        12. SCOPE: FAIL if 'root.mainloop()' is missing or if the UI is non-responsive.
         ⚠️ RESPONSE FORMAT:
         - Start with 'PASS' ONLY if the code is 100% production-ready.
         - Start with 'FAIL' followed by a detailed technical report in English for the Coder to fix.
