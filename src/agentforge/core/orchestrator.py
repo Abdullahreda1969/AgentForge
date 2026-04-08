@@ -4,20 +4,21 @@ import os
 import time
 import datetime
 
-# استيرادات الوكلاء بناءً على هيكلية مشروعك
+# استيرادات الوكلاء بناءً على هيكلية مشروعك (تأكد من وجود هذه الملفات في مساراتها)
 from agentforge.agents.architect import ArchitectAgent
 from agentforge.agents.coder import CoderAgent
 from agentforge.agents.tester import TesterAgent
 from agentforge.agents.executor import ExecutorAgent
 from agentforge.agents.reviewer import Reviewer
 
+# إعدادات الطباعة والسجل
 sys.stdout.reconfigure(encoding='utf-8')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("AgentForge")
 
 class AgentForgeOrchestrator:
     def __init__(self):
-        # تهيئة الوكلاء بنفس المسميات القديمة
+        # تهيئة الوكلاء
         self.architect = ArchitectAgent()
         self.coder = CoderAgent()
         self.tester = TesterAgent()
@@ -28,56 +29,50 @@ class AgentForgeOrchestrator:
             "language": "python",
             "description": "",
             "structure": {},
-            "status": "initialized"
+            "status": "initialized",
+            "duration": 0
         }
 
     def start_cycle(self, project_name, description, lang="python", auto_run=True, max_attempts=3):
-        """يبدأ دورة حياة المشروع مع الحفاظ على التوافق مع app_gui.py"""
-        self.project_state = {
+        """الدالة الأساسية التي تبدأ منها عملية الصهر"""
+        start_time = time.time()
+        self.project_state.update({
             "name": project_name,
             "description": description,
             "lang": lang,
             "auto_run": auto_run,
             "max_attempts": max_attempts,
-            "status": "starting",
-            "structure": {}
-        }
+            "status": "starting"
+        })
         
-        logger.info(f"🚀 انطلاق المهمة: {project_name}")
+        logger.info(f"🚀 بدء صهر المشروع: {project_name}")
         
-        # المرحلة 1: التصميم
-        self._run_design_phase()
-        
-        # المرحلة 2: البرمجة (المحسنة)
+        # 1. مرحلة التصميم
+        try:
+            structure = self.architect.design_project(project_name, description)
+            self.project_state["structure"] = structure
+            logger.info(f"✅ تم تصميم الهيكل: {len(structure)} ملفات.")
+        except Exception as e:
+            logger.error(f"❌ فشل المصمم: {e}")
+            return {"status": "failed", "error": "Architect failed"}
+
+        # 2. مرحلة البرمجة والتدقيق
         success = self._run_coding_phase()
         
+        self.project_state["duration"] = int(time.time() - start_time)
         self.project_state["status"] = "completed" if success else "failed"
+        
         return self.project_state
-    
-    def _run_design_phase(self):
-        """مرحلة هندسة هيكل المشروع"""
-        logger.info(f"🏗️ المرحلة 1: تصميم الهيكل لمشروع {self.project_state['name']}...")
-        structure = self.architect.design_project(
-            self.project_state["name"], 
-            self.project_state["description"]
-        )
-        self.project_state["structure"] = structure
-        logger.info(f"✅ تم تحديد {len(structure)} ملفات للبناء.")
 
     def _run_coding_phase(self):
-        logger.info("💻 المرحلة 2: البرمجة مع الحماية من استهلاك الـ Quota...")
-        
         project_dir = os.path.join(os.getcwd(), "projects", self.project_state["name"])
         os.makedirs(project_dir, exist_ok=True)
 
-        # دمج القواعد الذهبية لضمان "الذكاء الحركي" في الساعة
-        instruction_header = "🚨 CRITICAL ARCHITECTURE RULE: YOU MUST USE root.after() FOR RECURSIVE UPDATES. STATIC TIME IS A FAILURE. 🚨"
-        
-        technical_rules = (
-            "\n### GOLDEN ARCHITECTURE RULES ###\n"
-            "1. REAL-TIME LOGIC: Use `root.after()` for periodic updating.\n"
-            "2. WINDOW STABILITY: Use `root.title()` and `root.mainloop()` correctly.\n"
-            "3. NO TERMINAL: All outputs must appear on the GUI Label.\n"
+        # 🚨 القاعدة الذهبية (السر الذي يجعل الساعة تعمل)
+        instruction_header = (
+            "CRITICAL RULE: For REAL-TIME updates (like clocks), YOU MUST USE 'root.after(1000, function_name)'.\n"
+            "STRICT PROHIBITION: NEVER use absolute paths like 'C:\\Users\\...'. Use relative paths only.\n"
+            "STRICT PROHIBITION: DO NOT use infinite while-loops for UI updates."
         )
 
         max_retries = self.project_state.get("max_attempts", 3)
@@ -92,72 +87,87 @@ class AgentForgeOrchestrator:
             while attempts < max_retries and not success:
                 try:
                     attempts += 1
-                    logger.info(f"📝 محاولة برمجة {file_name} رقم ({attempts})...")
+                    logger.info(f"📝 برمجة {file_name} - محاولة {attempts}/{max_retries}")
                     
+                    # تحضير المهمة مع التعليمات الصارمة
                     current_task = " ".join(task) if isinstance(task, list) else task
-                    enhanced_task = f"{instruction_header}\n\nTask: {current_task}\n{technical_rules}"
+                    full_prompt = f"{instruction_header}\n\nTask: {current_task}"
                     
-                    # نرسل آخر محاولة فقط لتوفير الـ Tokens ومنع الـ 429
+                    # تقليل الـ history لمنع خطأ 429
                     short_history = history[-1:] if history else []
 
-                    # 1. البرمجة (Coder)
+                    # استدعاء المبرمج
                     code = self.coder.write_code(
                         file_name, 
                         self.project_state["description"], 
-                        enhanced_task, 
+                        full_prompt, 
                         history=short_history
                     )
 
-                    # 2. المراجعة (Reviewer)
-                    logger.info("⏳ مراجعة الكود...")
-                    review_result = self.reviewer.review_code(code, enhanced_task, history=short_history)
-                    
-                    if review_result.strip().upper().startswith("FAIL"):
-                        logger.warning(f"⚠️ المراجع رفض الكود. المحاولة القادمة ستكون أذكى.")
-                        history.append(f"Attempt {attempts} - Review Fail: {review_result}")
+                    # المراجعة المنطقية
+                    review_result = self.reviewer.review_code(code, full_prompt, history=short_history)
+                    if "FAIL" in review_result.upper():
+                        logger.warning(f"⚠️ المراجع رفض الكود في محاولة {attempts}")
+                        history.append({"feedback": review_result})
                         continue
 
-                    # 3. الفحص النحوي (Tester)
+                    # الفحص النحوي
                     is_valid, error_msg = self.tester.validate_code(code)
                     if not is_valid:
-                        logger.warning(f"❌ خطأ سنتاكس في {file_name}.")
-                        history.append(f"Attempt {attempts} - Syntax Error: {error_msg}")
+                        logger.warning(f"❌ خطأ نحو في {file_name}")
+                        history.append({"feedback": error_msg})
                         continue
 
                     # حفظ الملف
                     file_path = os.path.join(project_dir, file_name)
                     self._save_file(file_path, code)
 
-                    # 4. اختبار التشغيل (Executor)
+                    # اختبار التشغيل الفعلي
                     if file_name.endswith(".py") and should_execute:
                         run_ok, run_output = self.executor.execute_code(file_path)
                         if run_ok:
-                            logger.info(f"🎉 نجاح التشغيل لـ {file_name}!")
                             success = True
+                            logger.info(f"🎉 تم صهر {file_name} بنجاح!")
                         else:
-                            logger.warning(f"⚠️ فشل التشغيل، جاري محاولة الإصلاح...")
-                            history.append(f"Attempt {attempts} - Runtime Error: {run_output}")
+                            history.append({"feedback": f"Runtime Error: {run_output}"})
                             continue
                     else:
                         success = True
 
-                    api_failure_count = 0 # تصفير عداد الأخطاء عند النجاح
+                    api_failure_count = 0 # تصفير عند النجاح
 
                 except Exception as e:
                     if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                         api_failure_count += 1
                         wait_time = 60 * api_failure_count
-                        logger.warning(f"🕒 Quota Limit! انتظار {wait_time} ثانية... (محاولة {api_failure_count}/3)")
-                        if api_failure_count >= 3:
-                            logger.error("🛑 توقف اضطراري لحماية الـ API.")
-                            return False
+                        logger.warning(f"🕒 ضغط API! سأنتظر {wait_time} ثانية...")
+                        if api_failure_count >= 3: return False
                         time.sleep(wait_time)
                         attempts -= 1
                     else:
-                        logger.error(f"🚨 خطأ غير متوقع: {e}")
+                        logger.error(f"🚨 خطأ: {e}")
                         return False
 
+        # --- توليد ملف التشغيل start_app.bat (بدون مسافات بادئة للأوامر) ---
+        self._generate_bat_file(project_dir)
+        
         return True
+
+    def _generate_bat_file(self, project_dir):
+        """توليد ملف بات نظيف بدون مسافات بادئة للأوامر لتجنب خطأ الويندوز"""
+        bat_content = (
+            "@echo off\n"
+            "title AgentForge Launcher\n"
+            "echo 🚀 Launching Project...\n"
+            "python main.py\n"
+            "if %errorlevel% neq 0 (\n"
+            "    echo ❌ Application Crashed!\n"
+            ")\n"
+            "pause"
+        )
+        bat_path = os.path.join(project_dir, "start_app.bat")
+        with open(bat_path, "w", encoding="utf-8") as f:
+            f.write(bat_content)
 
     def _save_file(self, path, content):
         directory = os.path.dirname(path)
