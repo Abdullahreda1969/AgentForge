@@ -6,6 +6,13 @@ import gspread # إضافة مكتبة الربط
 from google.oauth2.service_account import Credentials # إضافة مكتبة التصاريح
 from datetime import datetime # لإضافة الوقت والتاريخ
 
+# كود تجريبي سريع تحت الـ Imports
+try:
+    creds_info = st.secrets["gcp_service_account"]
+    st.sidebar.success("✅ تم العثور على صلاحيات Google Sheets")
+except Exception:
+    st.sidebar.error("❌ صلاحيات Google Sheets مفقودة في Secrets")
+
 # --- إعداد المسارات لضمان رؤية المجلدات في السحابة ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 src_path = os.path.join(current_dir, "src")
