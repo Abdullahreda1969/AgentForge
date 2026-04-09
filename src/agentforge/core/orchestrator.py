@@ -88,10 +88,13 @@ class AgentForgeOrchestrator:
 
         # 🚨 القاعدة الذهبية (التعليمات التي تُجبر الذكاء الاصطناعي على الانضباط)
         instruction_header = (
-            "CRITICAL RULE: For REAL-TIME updates (like clocks), YOU MUST USE 'root.after(1000, function_name)'.\n"
-            "STRICT PROHIBITION: NEVER use absolute paths. Use relative paths only.\n"
-            "STRICT PROHIBITION: DO NOT use infinite while-loops for UI updates.\n"
-            "STRICT PROHIBITION: For .bat files, Output ONLY raw commands. NO emojis, NO markdown."
+            "--- SOFTWARE DESIGN & ARCHITECTURE RULES ---\n"
+            "1. REAL-TIME ENGINE: For any dynamic UI (clocks, monitors), you MUST use 'root.after(1000, update_func)'.\n"
+            "2. UI BLOCKING: NEVER use 'while True' or 'time.sleep()' inside GUI code. It freezes the app.\n"
+            "3. PATH SECURITY: Use relative paths ONLY. Assume the current directory is the project root.\n"
+            "4. BATCH FILES (.bat): Output ONLY raw CMD commands. No markdown (```), no explanations, no emojis.\n"
+            "5. NO HALLUCINATION: If a file is named 'main.py', ensure it is the primary entry point.\n"
+            "6. CLEAN CODE: Do not include comments like 'This is your code' or 'Here is the file'."
         )
 
         max_retries = self.project_state.get("max_attempts", 3)
@@ -116,8 +119,7 @@ class AgentForgeOrchestrator:
                     logger.info(f"📝 برمجة {file_name} - محاولة {attempts}/{max_retries}")
                     
                     current_task = " ".join(task) if isinstance(task, list) else task
-                    full_prompt = f"{instruction_header}\n\nTask: {current_task}"
-                    short_history = history[-1:] if history else []
+                    full_prompt = f"{instruction_header}\n\n[DESIGN CONTEXT]: Use 'Design' terminology.\nTask: {current_task}"                    short_history = history[-1:] if history else []
 
                     # استدعاء المبرمج
                     code = self.coder.write_code(
