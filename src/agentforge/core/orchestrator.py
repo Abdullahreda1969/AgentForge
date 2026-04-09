@@ -50,11 +50,18 @@ class AgentForgeOrchestrator:
         # 1. مرحلة التصميم
         try:
             structure = self.architect.design_project(project_name, description)
+            
+            # التحقق من أن المصمم لم يعِد None أو قاموساً فارغاً
+            if not structure or not isinstance(structure, dict):
+                logger.error("❌ فشل المصمم في تقديم هيكل صالح للمشروع.")
+                return {"status": "failed", "error": "Architect returned empty structure"}
+
             self.project_state["structure"] = structure
             logger.info(f"✅ تم تصميم الهيكل: {len(structure)} ملفات.")
+            
         except Exception as e:
-            logger.error(f"❌ فشل المصمم: {e}")
-            return {"status": "failed", "error": "Architect failed"}
+            logger.error(f"❌ خطأ غير متوقع أثناء التصميم: {e}")
+            return {"status": "failed", "error": str(e)}
 
         # 2. مرحلة البرمجة والتدقيق
         success = self._run_coding_phase()
@@ -92,12 +99,7 @@ class AgentForgeOrchestrator:
                     # تحضير المهمة مع التعليمات الصارمة
                     current_task = " ".join(task) if isinstance(task, list) else task
                     full_prompt = f"{instruction_header}\n\nTask: {current_task}"
-                    if "503" in str(e) or "UNAVAILABLE" in str(e):
-                        api_failure_count += 1
-                        wait_time = 120 * api_failure_count # زدنا الانتظار لدقيقتين
-                        logger.warning(f"🕒 السيرفر مزدحم! سأنتظر {wait_time} ثانية قبل المحاولة مجدداً...")
-                        time.sleep(wait_time)
-                        attempts -= 1 # لا تحسبها محاولة فاشلة، أعدها
+                                            
                     # تقليل الـ history لمنع خطأ 429
                     short_history = history[-1:] if history else []
 
@@ -152,7 +154,17 @@ class AgentForgeOrchestrator:
                     else:
                         logger.error(f"🚨 خطأ: {e}")
                         return False
-
+                except Exception as e:  # تأكد أن e موجودة هنا
+                    error_str = str(e)
+                    if "503" in error_str or "UNAVAILABLE" in error_str:
+                        api_failure_count += 1
+                        wait_time = 120 * api_failure_count
+                        logger.warning(f"🕒 السيرفر مزدحم! سأنتظر {wait_time} ثانية...")
+                        time.sleep(wait_time)
+                        # لا تضع "attempts -= 1" إلا إذا كنت متأكداً أنك داخل حلقة while
+                    else:
+                        logger.error(f"🚨 خطأ غير متوقع: {error_str}") # استخدم error_str هنا
+                        return False
         # --- توليد ملف التشغيل start_app.bat (بدون مسافات بادئة للأوامر) ---
         self._generate_bat_file(project_dir)
         

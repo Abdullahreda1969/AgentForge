@@ -40,12 +40,16 @@ class ArchitectAgent:
         logger.info(f"🧠 المصمم الاحترافي يخطط لمشروع: {name}...")
         
         full_prompt = f"{self.system_prompt}\n\nProject Name: {name}\nDescription: {description}"
-        
         try:
             response = self.client.models.generate_content(
                 model=self.model_id,
-                contents=full_prompt
+                contents=full_prompt,
+                config={
+                    'response_mime_type': 'application/json',
+                }
             )
+            # للحصول على النص المستخرج
+            result_text = response.text
             
             # تحويل النص إلى قاموس
             structure = self._parse_json_response(response.text)
@@ -63,11 +67,8 @@ class ArchitectAgent:
 
         except Exception as e:
             logger.error(f"❌ خطأ في تواصل المصمم: {e}")
-            return {
-                "main.py": "Primary script",
-                "requirements.txt": "dependencies",
-                "README.md": "documentation"
-            }
+            # بدلاً من إرجاع ملفات وهمية، نرجع None أو نرفع الخطأ
+            return None
 
     def _parse_json_response(self, text):
         """دالة مساعدة لتنظيف النص وتحويله إلى JSON"""
