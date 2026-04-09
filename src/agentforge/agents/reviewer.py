@@ -8,7 +8,7 @@ class Reviewer:
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         # نلتزم بنفس الموديل المستخدم في بقية الوكلاء لتوحيد الأداء
-        self.model_id = "models/gemma-3-4b-it"
+        self.model_id = "models/gemma-3-12b-it"
 
     def review_code(self, code, task, history=None): 
         """Reviews the code based on task requirements and strict quality standards."""
