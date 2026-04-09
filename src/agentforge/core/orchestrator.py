@@ -49,8 +49,19 @@ class AgentForgeOrchestrator:
         
         # 1. مرحلة التصميم
         try:
-            structure = self.architect.design_project(project_name, description)
-            
+            structure_raw = self.architect.design_project(project_name, description)
+
+            # دالة تنظيف يدوية بسيطة إذا أضاف الموديل علامات ```json
+            if isinstance(structure_raw, str):
+                import json
+                clean_json = structure_raw.replace("```json", "").replace("```", "").strip()
+                try:
+                    structure = json.loads(clean_json)
+                except:
+                    logger.error("❌ فشل تنظيف الـ JSON اليدوي")
+                    return {"status": "failed", "error": "JSON parse error"}
+            else:
+                structure = structure_raw            
             # التحقق من أن المصمم لم يعِد None أو قاموساً فارغاً
             if not structure or not isinstance(structure, dict):
                 logger.error("❌ فشل المصمم في تقديم هيكل صالح للمشروع.")
