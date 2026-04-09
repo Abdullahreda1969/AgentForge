@@ -86,18 +86,26 @@ class AgentForgeOrchestrator:
         project_dir = os.path.join(os.getcwd(), "projects", self.project_state["name"])
         os.makedirs(project_dir, exist_ok=True)
 
-        # 🚨 القاعدة الذهبية (السر الذي يجعل الساعة تعمل)
+        # 🚨 القاعدة الذهبية (التعليمات التي تُجبر الذكاء الاصطناعي على الانضباط)
         instruction_header = (
             "CRITICAL RULE: For REAL-TIME updates (like clocks), YOU MUST USE 'root.after(1000, function_name)'.\n"
-            "STRICT PROHIBITION: NEVER use absolute paths like 'C:\\Users\\...'. Use relative paths only.\n"
-            "STRICT PROHIBITION: DO NOT use infinite while-loops for UI updates."
+            "STRICT PROHIBITION: NEVER use absolute paths. Use relative paths only.\n"
+            "STRICT PROHIBITION: DO NOT use infinite while-loops for UI updates.\n"
+            "STRICT PROHIBITION: For .bat files, Output ONLY raw commands. NO emojis, NO markdown."
         )
 
         max_retries = self.project_state.get("max_attempts", 3)
         should_execute = self.project_state.get("auto_run", True)
         api_failure_count = 0
+        
+        # قائمة بالكلمات التي يجب تجاهلها (الفلتر)
+        forbidden_keys = ["project_name", "description", "directory_structure", "file_contents"]
 
         for file_name, task in self.project_state["structure"].items():
+            # 1. تطبيق الفلتر فوراً قبل البدء
+            if file_name.lower() in forbidden_keys:
+                continue
+
             success = False
             attempts = 0
             history = []
@@ -107,11 +115,8 @@ class AgentForgeOrchestrator:
                     attempts += 1
                     logger.info(f"📝 برمجة {file_name} - محاولة {attempts}/{max_retries}")
                     
-                    # تحضير المهمة مع التعليمات الصارمة
                     current_task = " ".join(task) if isinstance(task, list) else task
                     full_prompt = f"{instruction_header}\n\nTask: {current_task}"
-                                            
-                    # تقليل الـ history لمنع خطأ 429
                     short_history = history[-1:] if history else []
 
                     # استدعاء المبرمج
@@ -140,48 +145,37 @@ class AgentForgeOrchestrator:
                     file_path = os.path.join(project_dir, file_name)
                     self._save_file(file_path, code)
 
-                    # اختبار التشغيل الفعلي
+                    # اختبار التشغيل الفعلي (للملفات البرمجية فقط)
                     if file_name.endswith(".py") and should_execute:
                         run_ok, run_output = self.executor.execute_code(file_path)
                         if run_ok:
                             success = True
-                            logger.info(f"🎉 تم تصميم {file_name} بنجاح!")
+                            logger.info(f"🎉 تم صهر {file_name} بنجاح!")
                         else:
+                            logger.warning(f"⚠️ فشل التشغيل: {run_output}")
                             history.append({"feedback": f"Runtime Error: {run_output}"})
                             continue
                     else:
-                        success = True
+                        success = True # لملفات مثل README أو .bat
 
-                    api_failure_count = 0 # تصفير عند النجاح
+                    api_failure_count = 0 
 
-                except Exception as e:
-                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                        api_failure_count += 1
-                        wait_time = 60 * api_failure_count
-                        logger.warning(f"🕒 ضغط API! سأنتظر {wait_time} ثانية...")
-                        if api_failure_count >= 3: return False
-                        time.sleep(wait_time)
-                        attempts -= 1
-                    else:
-                        logger.error(f"🚨 خطأ: {e}")
-                        return False
                 except Exception as e:
                     error_msg = str(e)
-                    if "503" in error_msg or "429" in error_msg:
-                        # إذا كان السيرفر مضغوطاً، انتظر واطلب منه مرة أخرى بهدوء
-                        wait_time = 30  # انتظر 30 ثانية قبل المحاولة التالية
-                        logger.warning(f"🕒 السيرفر يطلب مهلة.. سأنتظر {wait_time} ثانية ثم أكمل {file_name}")
+                    if any(x in error_msg for x in ["429", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE"]):
+                        api_failure_count += 1
+                        wait_time = 30 * api_failure_count
+                        logger.warning(f"🕒 ضغط سيرفر! انتظار {wait_time} ثانية... (محاولة {attempts})")
                         time.sleep(wait_time)
-                        attempts -= 1  # لكي لا تضيع المحاولة من الـ 3 محاولات
-                        continue 
+                        attempts -= 1 
+                        if api_failure_count >= 5: return False
                     else:
                         logger.error(f"🚨 خطأ غير متوقع: {error_msg}")
                         return False
-        # --- توليد ملف التشغيل start_app.bat (بدون مسافات بادئة للأوامر) ---
-        self._generate_bat_file(project_dir)
-        
-        return True
 
+        # توليد ملف التشغيل النهائي
+        self._generate_bat_file(project_dir)
+        return True
     def _generate_bat_file(self, project_dir):
         """توليد ملف بات نظيف بدون مسافات بادئة للأوامر لتجنب خطأ الويندوز"""
         bat_content = (
