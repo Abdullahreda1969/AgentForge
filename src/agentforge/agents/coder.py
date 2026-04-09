@@ -8,7 +8,7 @@ class CoderAgent:
     def __init__(self):
         # إضافة إعدادات الـ API لضمان التوافق مع v1beta
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model_id = "gemini-1.5-flash-8b" 
+        self.model_id = "models/gemma-3-1b-it" 
        # داخل ملف coder.py
         self.system_prompt = """
         You are a Senior Python Developer specializing in dynamic GUI applications.
