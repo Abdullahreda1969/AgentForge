@@ -31,6 +31,8 @@ class ArchitectAgent:
         NAMING: Use snake_case for filenames and PascalCase for Classes.
 
         ENTRY POINT: Ensure there is a clear main.py to launch the application.
+        
+        Output MUST be a raw JSON object ONLY. No preamble, no markdown code blocks, no explanation. Just the JSON.
         """
 
     def design_project(self, name, description):

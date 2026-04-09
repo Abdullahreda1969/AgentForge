@@ -92,7 +92,12 @@ class AgentForgeOrchestrator:
                     # تحضير المهمة مع التعليمات الصارمة
                     current_task = " ".join(task) if isinstance(task, list) else task
                     full_prompt = f"{instruction_header}\n\nTask: {current_task}"
-                    
+                    if "503" in str(e) or "UNAVAILABLE" in str(e):
+                        api_failure_count += 1
+                        wait_time = 120 * api_failure_count # زدنا الانتظار لدقيقتين
+                        logger.warning(f"🕒 السيرفر مزدحم! سأنتظر {wait_time} ثانية قبل المحاولة مجدداً...")
+                        time.sleep(wait_time)
+                        attempts -= 1 # لا تحسبها محاولة فاشلة، أعدها
                     # تقليل الـ history لمنع خطأ 429
                     short_history = history[-1:] if history else []
 
