@@ -15,7 +15,7 @@ class ArchitectAgent:
 
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model_id = "models/gemini-2.0-flash-lite"
+        self.model_id = "models/gemini-exp-1206"
         # 1. تحديث الـ System Prompt ليكون أكثر صرامة واحترافية
         self.system_prompt = """
         You are a Senior Software Architect. Your goal is to design a clean, modular directory structure for Python projects.
