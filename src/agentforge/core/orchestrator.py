@@ -87,16 +87,14 @@ class AgentForgeOrchestrator:
         os.makedirs(project_dir, exist_ok=True)
 
         # 🚨 القاعدة الذهبية (التعليمات التي تُجبر الذكاء الاصطناعي على الانضباط)
+        # التعديل المطلوب في دالة _run_coding_phase
         instruction_header = (
-            "--- SOFTWARE DESIGN & ARCHITECTURE RULES ---\n"
-            "1. REAL-TIME ENGINE: For any dynamic UI (clocks, monitors), you MUST use 'root.after(1000, update_func)'.\n"
-            "2. UI BLOCKING: NEVER use 'while True' or 'time.sleep()' inside GUI code. It freezes the app.\n"
-            "3. PATH SECURITY: Use relative paths ONLY. Assume the current directory is the project root.\n"
-            "4. BATCH FILES (.bat): Output ONLY raw CMD commands. No markdown (```), no explanations, no emojis.\n"
-            "5. NO HALLUCINATION: If a file is named 'main.py', ensure it is the primary entry point.\n"
-            "6. CLEAN CODE: Do not include comments like 'This is your code' or 'Here is the file'."
+            "--- WEB DESIGN RULES ---\n"
+            "1. FRAMEWORK: Use 'Streamlit' for the UI. It is the best for our cloud environment.\n"
+            "2. NO GUI LIBRARIES: Strictly PROHIBITED to use tkinter, PyQt, or any desktop library.\n"
+            "3. REAL-TIME: Use 'st.empty()' and a loop with 'time.sleep(1)' for real-time updates like clocks.\n"
+            "4. PATHS: Use relative paths only."
         )
-
         max_retries = self.project_state.get("max_attempts", 3)
         should_execute = self.project_state.get("auto_run", True)
         api_failure_count = 0

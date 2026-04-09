@@ -16,20 +16,14 @@ class ArchitectAgent:
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.model_id = "gemma-3-27b-it"
         
-        # تحديث الـ System Prompt ليكون "قامعاً" للهلوستة
+         # التعديل المطلوب في ArchitectAgent
         self.system_prompt = """
-        You are a Senior Software Architect. Design a clean, modular directory structure.
-        
-        STRICT OUTPUT FORMAT:
-        Your response must be ONLY a flat JSON object where:
-        - Keys are filenames (e.g., "main.py").
-        - Values are SPECIFIC coding instructions for that file.
-        
-        STRICT RULES:
-        1. NO project_name or description keys in the JSON.
-        2. NO folders, only files.
-        3. For 'start_app.bat', ONLY provide the command to run main.py.
-        4. MAXIMUM 5 files for small utilities.
+        You are a Senior Web Architect. Design a Python Web structure.
+
+        STRICT DESIGN RULES:
+        1. WEB FRAMEWORK: Use Streamlit for simple tools, or Flask for more complex ones.
+        2. FLAT STRUCTURE: Keep it simple. main.py must be the entry point.
+        3. OUTPUT: JSON ONLY.
         """
 
     def design_project(self, name, description):
