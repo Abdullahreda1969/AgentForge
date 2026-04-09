@@ -34,7 +34,7 @@ class AgentForgeOrchestrator:
         }
 
     def start_cycle(self, project_name, description, lang="python", auto_run=True, max_attempts=3):
-        """الدالة الأساسية التي تبدأ منها عملية الصهر"""
+        """الدالة الأساسية التي تبدأ منها عملية التصميم"""
         start_time = time.time()
         self.project_state.update({
             "name": project_name,
@@ -45,7 +45,7 @@ class AgentForgeOrchestrator:
             "status": "starting"
         })
         
-        logger.info(f"🚀 بدء صهر المشروع: {project_name}")
+        logger.info(f"🚀 بدء تصميم المشروع: {project_name}")
         
         # 1. مرحلة التصميم
         try:
@@ -145,7 +145,7 @@ class AgentForgeOrchestrator:
                         run_ok, run_output = self.executor.execute_code(file_path)
                         if run_ok:
                             success = True
-                            logger.info(f"🎉 تم صهر {file_name} بنجاح!")
+                            logger.info(f"🎉 تم تصميم {file_name} بنجاح!")
                         else:
                             history.append({"feedback": f"Runtime Error: {run_output}"})
                             continue
@@ -165,16 +165,17 @@ class AgentForgeOrchestrator:
                     else:
                         logger.error(f"🚨 خطأ: {e}")
                         return False
-                except Exception as e:  # تأكد أن e موجودة هنا
-                    error_str = str(e)
-                    if "503" in error_str or "UNAVAILABLE" in error_str:
-                        api_failure_count += 1
-                        wait_time = 120 * api_failure_count
-                        logger.warning(f"🕒 السيرفر مزدحم! سأنتظر {wait_time} ثانية...")
+                except Exception as e:
+                    error_msg = str(e)
+                    if "503" in error_msg or "429" in error_msg:
+                        # إذا كان السيرفر مضغوطاً، انتظر واطلب منه مرة أخرى بهدوء
+                        wait_time = 30  # انتظر 30 ثانية قبل المحاولة التالية
+                        logger.warning(f"🕒 السيرفر يطلب مهلة.. سأنتظر {wait_time} ثانية ثم أكمل {file_name}")
                         time.sleep(wait_time)
-                        # لا تضع "attempts -= 1" إلا إذا كنت متأكداً أنك داخل حلقة while
+                        attempts -= 1  # لكي لا تضيع المحاولة من الـ 3 محاولات
+                        continue 
                     else:
-                        logger.error(f"🚨 خطأ غير متوقع: {error_str}") # استخدم error_str هنا
+                        logger.error(f"🚨 خطأ غير متوقع: {error_msg}")
                         return False
         # --- توليد ملف التشغيل start_app.bat (بدون مسافات بادئة للأوامر) ---
         self._generate_bat_file(project_dir)

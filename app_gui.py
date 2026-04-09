@@ -96,7 +96,7 @@ st.subheader("محرك بناء البرمجيات الذكي - v0.9.0")
 project_name = st.text_input("اسم المشروع", placeholder="مثلاً: Pharmacy_System")
 project_desc = st.text_area("ماذا تريد أن تبني؟", placeholder="اكتب وصفاً تفصيلياً...")
 
-if st.button("إطلاق عملية الصهر (Forge)"):
+if st.button("إطلاق عملية التصميم (Forge)"):
     if project_name and project_desc:
         clean_name = project_name.replace(" ", "_")
         
