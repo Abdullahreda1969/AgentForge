@@ -119,7 +119,10 @@ class AgentForgeOrchestrator:
                     logger.info(f"📝 برمجة {file_name} - محاولة {attempts}/{max_retries}")
                     
                     current_task = " ".join(task) if isinstance(task, list) else task
-                    full_prompt = f"{instruction_header}\n\n[DESIGN CONTEXT]: Use 'Design' terminology.\nTask: {current_task}"                    short_history = history[-1:] if history else []
+                    
+                    full_prompt = f"{instruction_header}\n\n[DESIGN CONTEXT]: Use 'Design' terminology.\nTask: {current_task}"
+                    
+                    short_history = history[-1:] if history else []
 
                     # استدعاء المبرمج
                     code = self.coder.write_code(
