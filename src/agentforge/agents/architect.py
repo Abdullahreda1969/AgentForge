@@ -12,67 +12,66 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class ArchitectAgent:
-
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.model_id = "gemma-3-27b-it"
-        # 1. تحديث الـ System Prompt ليكون أكثر صرامة واحترافية
-        self.system_prompt = """
-        You are a Senior Software Architect. Your goal is to design a clean, modular directory structure for Python projects.
-
-        STRICT DESIGN RULES:
-
-        MODULARITY: Separate GUI logic from data processing.
-
-        DOCUMENTATION: Always include a README.md with setup instructions.
-
-        DEPENDENCIES: Always plan for a requirements.txt file.
-
-        NAMING: Use snake_case for filenames and PascalCase for Classes.
-
-        ENTRY POINT: Ensure there is a clear main.py to launch the application.
         
-        Output MUST be a raw JSON object ONLY. No preamble, no markdown code blocks, no explanation. Just the JSON.
+        # تحديث الـ System Prompt ليكون "قامعاً" للهلوستة
+        self.system_prompt = """
+        You are a Senior Software Architect. Design a clean, modular directory structure.
+        
+        STRICT OUTPUT FORMAT:
+        Your response must be ONLY a flat JSON object where:
+        - Keys are filenames (e.g., "main.py").
+        - Values are SPECIFIC coding instructions for that file.
+        
+        STRICT RULES:
+        1. NO project_name or description keys in the JSON.
+        2. NO folders, only files.
+        3. For 'start_app.bat', ONLY provide the command to run main.py.
+        4. MAXIMUM 5 files for small utilities.
         """
 
     def design_project(self, name, description):
-        """يستلم الوصف ويعيد هيكل الملفات كقاموس (Dictionary)"""
         logger.info(f"🧠 المصمم الاحترافي يخطط لمشروع: {name}...")
         
-        full_prompt = f"{self.system_prompt}\n\nProject Name: {name}\nDescription: {description}"
+        # إضافة تعليمات مخصصة لكل طلب لتقليل الملفات
+        user_context = f"Project: {name}\nGoal: {description}\nContext: Create a functional Python GUI application."
+        full_prompt = f"{self.system_prompt}\n\n{user_context}"
+        
         try:
             response = self.client.models.generate_content(
                 model=self.model_id,
                 contents=full_prompt,
             )
-            # للحصول على النص المستخرج
-            result_text = response.text
             
-            # تحويل النص إلى قاموس
             structure = self._parse_json_response(response.text)
             
-            # 2. ضمان وجود الملفات الاحترافية (Safety Check)
-            # إذا نسي الذكاء الاصطناعي أياً منها، نقوم بإضافتها يدوياً هنا
-            if "requirements.txt" not in structure:
-                structure["requirements.txt"] = "List of all external libraries used in the project."
-            if "README.md" not in structure:
-                structure["README.md"] = f"Technical documentation and setup guide for {name}."
+            # ضمان وجود الملفات الأساسية بتعليمات برمجية وليست وصفية
             if "main.py" not in structure:
-                structure["main.py"] = "The main execution script to start the application."
+                structure["main.py"] = "Create the main GUI entry point using tkinter."
+            if "start_app.bat" not in structure:
+                structure["start_app.bat"] = "python main.py"
                 
             return structure
 
         except Exception as e:
             logger.error(f"❌ خطأ في تواصل المصمم: {e}")
-            # بدلاً من إرجاع ملفات وهمية، نرجع None أو نرفع الخطأ
-            return None
+            return {"main.py": "import tkinter as tk\nroot = tk.Tk()\nroot.mainloop()"}
 
     def _parse_json_response(self, text):
-        """دالة مساعدة لتنظيف النص وتحويله إلى JSON"""
+        """دالة قوية لاستخراج الـ JSON حتى لو وجد نص غريب حوله"""
         try:
-            # تنظيف الـ Markdown
+            # محاولة التنظيف العادية
             clean_text = text.replace("```json", "").replace("```", "").strip()
             return json.loads(clean_text)
-        except Exception as e:
-            logger.error(f"❌ فشل تحويل الرد إلى JSON: {e}")
-            return {"main.py": "Basic entry point"}
+        except:
+            try:
+                # محاولة البحث عن أول { وآخر } في حال وجود ثرثرة من الموديل
+                import re
+                match = re.search(r'(\{.*\})', text, re.DOTALL)
+                if match:
+                    return json.loads(match.group(1))
+            except Exception as e:
+                logger.error(f"❌ فشل تحويل الرد إلى JSON: {e}")
+                return {"main.py": "Coding task failed"}
