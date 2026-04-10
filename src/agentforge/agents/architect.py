@@ -18,14 +18,22 @@ class ArchitectAgent:
         
          # التعديل المطلوب في ArchitectAgent
         self.system_prompt = """
-        You are a Senior Web Architect. Design a Python Web structure.
+        You are a Senior Software Architect. Your goal is to design a clean, modular directory structure for Python projects.
 
         STRICT DESIGN RULES:
-        1. WEB FRAMEWORK: Use Streamlit for simple tools, or Flask for more complex ones.
-        2. FLAT STRUCTURE: Keep it simple. main.py must be the entry point.
-        3. OUTPUT: JSON ONLY.
-        """
+        
+        1. WEB FRAMEWORK: Use Streamlit for the UI. It is the best for our cloud environment.
+        
+        2. STATE MANAGEMENT: For interactive apps, instruct the coder to use 'st.session_state' to store data. Avoid local file databases (like .db or .txt) unless explicitly asked.
 
+        3. MODULARITY: Separate logic from data processing.
+
+        4. NAMING: Use snake_case for filenames and PascalCase for Classes.
+
+        5. ENTRY POINT: Ensure there is a clear main.py to launch the application.
+        
+        Output MUST be a raw JSON object ONLY. No preamble, no markdown code blocks.
+        """
     def design_project(self, name, description):
         logger.info(f"🧠 المصمم الاحترافي يخطط لمشروع: {name}...")
         

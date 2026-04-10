@@ -99,9 +99,13 @@ class AgentForgeOrchestrator:
         should_execute = self.project_state.get("auto_run", True)
         api_failure_count = 0
         
-        # قائمة بالكلمات التي يجب تجاهلها (الفلتر)
-        forbidden_keys = ["project_name", "description", "directory_structure", "file_contents"]
-
+        # القائمة المحدثة والذكية لمنع الهلوسة الهندسية
+        forbidden_keys = [
+            "project_name", "description", "directory_structure", 
+            "file_contents", "architecture", "testing", 
+            "code_example", "logic_explanation", "explanation"
+        ]
+        
         for file_name, task in self.project_state["structure"].items():
             # 1. تطبيق الفلتر فوراً قبل البدء
             if file_name.lower() in forbidden_keys:
@@ -113,14 +117,24 @@ class AgentForgeOrchestrator:
 
             while attempts < max_retries and not success:
                 try:
+                    # --- التعديل المطلوب داخل حلقة while ---
                     attempts += 1
                     logger.info(f"📝 برمجة {file_name} - محاولة {attempts}/{max_retries}")
-                    
-                    current_task = " ".join(task) if isinstance(task, list) else task
-                    
-                    full_prompt = f"{instruction_header}\n\n[DESIGN CONTEXT]: Use 'Design' terminology.\nTask: {current_task}"
-                    
-                    short_history = history[-1:] if history else []
+
+                    # تحويل المهمة لنص
+                    task_description = " ".join(task) if isinstance(task, list) else task
+
+                    # إجبار المبرمج على الالتزام بقواعد البات إذا كان الملف ينتهي بـ .bat
+                    if file_name.endswith(".bat"):
+                        current_task = (
+                            f"STRICT RULE: Output ONLY the raw execution command for {task_description}. "
+                            "NO markdown, NO emojis, NO explanations. Just the code line."
+                        )
+                    else:
+                        current_task = task_description
+
+                    full_prompt = f"{instruction_header}\n\nTask: {current_task}"
+                    # --- استدعاء المبرمج يتبع هنا ---
 
                     # استدعاء المبرمج
                     code = self.coder.write_code(
@@ -180,14 +194,13 @@ class AgentForgeOrchestrator:
         self._generate_bat_file(project_dir)
         return True
     def _generate_bat_file(self, project_dir):
-        """توليد ملف بات نظيف بدون مسافات بادئة للأوامر لتجنب خطأ الويندوز"""
         bat_content = (
             "@echo off\n"
-            "title AgentForge Launcher\n"
-            "echo 🚀 Launching Project...\n"
-            "python main.py\n"
+            "title AgentForge Web Launcher\n"
+            "echo [INFO] Starting Web Application...\n" # استبدال الصاروخ بنص
+            "streamlit run main.py\n"
             "if %errorlevel% neq 0 (\n"
-            "    echo ❌ Application Crashed!\n"
+            "    echo [ERROR] Application failed to start.\n" # استبدال الإكس بنص
             ")\n"
             "pause"
         )
@@ -196,8 +209,10 @@ class AgentForgeOrchestrator:
             f.write(bat_content)
 
     def _save_file(self, path, content):
+        clean_content = content.replace("```python", "").replace("```batch", "").replace("```", "").strip()
         directory = os.path.dirname(path)
         if directory and not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
+            
