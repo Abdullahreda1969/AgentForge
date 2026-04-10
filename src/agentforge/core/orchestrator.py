@@ -119,6 +119,10 @@ class AgentForgeOrchestrator:
                 try:
                     # --- التعديل المطلوب داخل حلقة while ---
                     attempts += 1
+                    
+                    # تعريف short_history هنا يضمن عدم ظهور خطأ "not defined"
+                    short_history = history[-1:] if history else []
+                    
                     logger.info(f"📝 برمجة {file_name} - محاولة {attempts}/{max_retries}")
 
                     # تحويل المهمة لنص
@@ -134,9 +138,7 @@ class AgentForgeOrchestrator:
                         current_task = task_description
 
                     full_prompt = f"{instruction_header}\n\nTask: {current_task}"
-                    # --- استدعاء المبرمج يتبع هنا ---
-
-                    # استدعاء المبرمج
+                    
                     code = self.coder.write_code(
                         file_name, 
                         self.project_state["description"], 
