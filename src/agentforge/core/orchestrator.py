@@ -196,7 +196,19 @@ class AgentForgeOrchestrator:
         return True
 
     def _generate_bat_file(self, project_dir):
-        bat_content = "@echo off\ntitle AgentForge Web Launcher\nstreamlit run main.py\npause"
+        # الحصول على اسم الملف فقط من المسار الكامل
+        bat_content = (
+            "@echo off\n"
+            "title AgentForge Web Launcher\n"
+            "echo [INFO] Moving to project directory...\n"
+            f"cd /d \"%~dp0\"\n"  # أمر سحري يجعل ملف الـ bat يعمل من مكانه الحالي
+            "echo [INFO] Starting Web Application...\n"
+            "streamlit run main.py\n"
+            "if %errorlevel% neq 0 (\n"
+            "    echo [ERROR] Application failed to start. Check if main.py exists.\n"
+            ")\n"
+            "pause"
+        )
         bat_path = os.path.join(project_dir, "start_app.bat")
         with open(bat_path, "w", encoding="utf-8") as f:
             f.write(bat_content)
