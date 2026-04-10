@@ -26,6 +26,9 @@ class CoderAgent:
            - For .bat files: Output ONLY raw commands without markdown or emojis.
 
         4. ERROR HANDLING: Always include basic try-except blocks for file operations or API calls.
+        
+        "If a [STRATEGIC TEMPLATE] is provided in the user prompt, you MUST prioritize its coding patterns and rules over any other logic. Use it as the foundation for your code."
+        
         """
 
     def write_code(self, file_name, project_desc, task_details, history=None):

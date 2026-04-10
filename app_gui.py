@@ -80,9 +80,23 @@ st.sidebar.header("⚙️ إعدادات المحرك")
 auto_run = st.sidebar.checkbox("تشغيل الكود تلقائياً (Auto-Run)", value=True)
 auto_install = st.sidebar.checkbox("تثبيت المكتبات المفقودة", value=True)
 max_attempts = st.sidebar.slider("أقصى عدد لمحاولات التصحيح", 1, 5, 3)
+
+# --- الإضافة الجديدة: قائمة القوالب الاستراتيجية ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎯 محاكاة القوالب (Templates)")
+template_options = {
+    "Auto-Detect ✨": "auto",
+    "Streamlit Web App 🌐": "streamlit_web",
+    "Tkinter Desktop 🖥️": "tkinter_desktop",
+    "Automation Script ⚙️": "automation_script",
+    "Pure Python Logic 🐍": "pure_python"
+}
+selected_template_label = st.sidebar.selectbox("اختر قالب المحاكاة:", list(template_options.keys()))
+selected_template_value = template_options[selected_template_label]
+# ---------------------------------------------
+
 st.sidebar.markdown("---")
 st.sidebar.info(f"إصدار المحرك: v0.9.6 Stable")
-
 # التنسيق الجمالي
 st.markdown("""
     <style>
@@ -118,7 +132,8 @@ if st.button("إطلاق عملية التصميم (Forge)"):
                 description=project_desc,
                 lang="python",
                 auto_run=auto_run,
-                max_attempts=max_attempts
+                max_attempts=max_attempts,
+                template=selected_template_value  # مررنا القالب هنا
             )
             
             if state.get("status") == "completed":

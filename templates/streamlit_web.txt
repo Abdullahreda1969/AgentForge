@@ -1,0 +1,26 @@
+# STREAMLIT STRATEGIC TEMPLATE
+# RULE 1: Never modify a widget's session_state key directly in the main flow.
+# RULE 2: Always use callback functions (on_change/on_click) to reset inputs.
+
+import streamlit as st
+
+def main():
+    # Initialize session state variables early
+    if 'tasks' not in st.session_state:
+        st.session_state.tasks = []
+    
+    st.title("Project Title")
+
+    # [PATTERN]: Define the callback function BEFORE the widget
+    def handle_callback():
+        if st.session_state.widget_input:
+            # Perform Logic here
+            st.session_state.tasks.append(st.session_state.widget_input)
+            # Resetting the key is ONLY allowed here
+            st.session_state.widget_input = ""
+
+    # [PATTERN]: Bind the widget to the callback
+    st.text_input("Enter data:", key="widget_input", on_change=handle_callback)
+
+if __name__ == "__main__":
+    main()
