@@ -24,6 +24,9 @@ class AgentForgeOrchestrator:
         self.tester = TesterAgent()
         self.executor = ExecutorAgent()
         self.reviewer = Reviewer()
+        # --- تعريف الذاكرة التاريخية (history) ---
+        # نقوم بتعريفها كقائمة فارغة في البداية
+        self.history = []
         self.project_state = {
             "name": "",
             "language": "python",
@@ -36,16 +39,24 @@ class AgentForgeOrchestrator:
     def start_cycle(self, project_name, description, lang="python", auto_run=True, max_attempts=3):
         """الدالة الأساسية التي تبدأ منها عملية التصميم"""
         start_time = time.time()
+        
+        
+        # 1. تصفير الذاكرة (History) فوراً عند بدء أي دورة جديدة
+        # هذا سيجعل المبرمج ينسى "الساعة" ويعتمد على ذكائه العام
+        self.history = []
+        
+        
         self.project_state.update({
             "name": project_name,
             "description": description,
             "lang": lang,
             "auto_run": auto_run,
             "max_attempts": max_attempts,
-            "status": "starting"
+            "status": "starting",
+            "files": [] # تأكد من تصفير قائمة الملفات أيضاً
         })
         
-        logger.info(f"🚀 بدء تصميم المشروع: {project_name}")
+        logger.info(f"🚀 بدء تصميم المشروع: {project_name}(تم تصفير الذاكرة القصيرة)")
         
         # 1. مرحلة التصميم
         try:
