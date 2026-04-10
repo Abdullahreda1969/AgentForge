@@ -5,7 +5,9 @@ import shutil
 import gspread # إضافة مكتبة الربط
 from google.oauth2.service_account import Credentials # إضافة مكتبة التصاريح
 from datetime import datetime # لإضافة الوقت والتاريخ
-
+import importlib
+import agentforge.core.orchestrator
+importlib.reload(agentforge.core.orchestrator)
 # كود تجريبي سريع تحت الـ Imports
 try:
     creds_info = st.secrets["gcp_service_account"]
