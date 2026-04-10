@@ -2,29 +2,29 @@ import streamlit as st
 import sys
 import os
 
-# 1. تأمين المسارات لضمان رؤية المجلدات الفرعية
-current_dir = os.path.dirname(os.path.abspath(__file__))
+import sys
+import os
+
+# 1. الحصول على مسار المجلد الحالي (agentforge) والمسار الأب (src)
+current_dir = os.path.dirname(os.path.abspath(__file__)) # /mount/src/agentforge
+parent_dir = os.path.dirname(current_dir)                # /mount/src
+
+# 2. إضافة المسارات لضمان شمولية البحث
 if current_dir not in sys.path:
     sys.path.append(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
 
-# 2. استيراد الأوركسترا بطريقة مرنة
+# 3. الاستيراد النهائي (سيحاول بكل الطرق الممكنة)
 try:
-    # جرب الاستيراد المباشر (للسحاب)
     from core.orchestrator import AgentForgeOrchestrator
-    print("Import successful via core.orchestrator")
 except ModuleNotFoundError:
-    # جرب الاستيراد الكامل (للمحلي)
     try:
         from agentforge.core.orchestrator import AgentForgeOrchestrator
-        print("Import successful via agentforge.core.orchestrator")
     except ModuleNotFoundError as e:
-        print(f"Critical Import Error: {e}")
+        # إذا فشل كل شيء، سنطبع المسارات الحالية في الـ Logs للمساعدة في التشخيص
+        print(f"Python Path: {sys.path}")
         raise e
-import shutil
-import gspread # إضافة مكتبة الربط
-from google.oauth2.service_account import Credentials # إضافة مكتبة التصاريح
-from datetime import datetime # لإضافة الوقت والتاريخ
-
 # كود تجريبي سريع تحت الـ Imports
 try:
     creds_info = st.secrets["gcp_service_account"]
