@@ -2,29 +2,26 @@ import streamlit as st
 import sys
 import os
 
-import sys
-import os
+# 1. تحديد مسار المجلد الذي يحتوي على الكود (src)
+# بما أننا في الجذر، فالمجلد هو 'src'
+base_path = os.path.join(os.getcwd(), "src")
 
-# 1. الحصول على مسار المجلد الحالي (agentforge) والمسار الأب (src)
-current_dir = os.path.dirname(os.path.abspath(__file__)) # /mount/src/agentforge
-parent_dir = os.path.dirname(current_dir)                # /mount/src
+# 2. إضافة المسار لبيئة بايثون لكي يرى ما بداخل src
+if base_path not in sys.path:
+    sys.path.append(base_path)
 
-# 2. إضافة المسارات لضمان شمولية البحث
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-
-# 3. الاستيراد النهائي (سيحاول بكل الطرق الممكنة)
+# 3. الآن الاستيراد سيعمل لأن بايثون سيبدأ البحث من داخل src
 try:
-    from core.orchestrator import AgentForgeOrchestrator
-except ModuleNotFoundError:
-    try:
-        from agentforge.core.orchestrator import AgentForgeOrchestrator
-    except ModuleNotFoundError as e:
-        # إذا فشل كل شيء، سنطبع المسارات الحالية في الـ Logs للمساعدة في التشخيص
-        print(f"Python Path: {sys.path}")
-        raise e
+    from agentforge.core.orchestrator import AgentForgeOrchestrator
+    print("✅ Success: Orchestrator loaded from src/agentforge/core")
+except ModuleNotFoundError as e:
+    print(f"❌ Error: Could not find AgentForge. Searched in: {sys.path}")
+    raise e
+import shutil
+import gspread # إضافة مكتبة الربط
+from google.oauth2.service_account import Credentials # إضافة مكتبة التصاريح
+from datetime import datetime # لإضافة الوقت والتاريخ
+
 # كود تجريبي سريع تحت الـ Imports
 try:
     creds_info = st.secrets["gcp_service_account"]
