@@ -1,13 +1,30 @@
 import streamlit as st
-import os
 import sys
+import os
+
+# 1. تأمين المسارات لضمان رؤية المجلدات الفرعية
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
+# 2. استيراد الأوركسترا بطريقة مرنة
+try:
+    # جرب الاستيراد المباشر (للسحاب)
+    from core.orchestrator import AgentForgeOrchestrator
+    print("Import successful via core.orchestrator")
+except ModuleNotFoundError:
+    # جرب الاستيراد الكامل (للمحلي)
+    try:
+        from agentforge.core.orchestrator import AgentForgeOrchestrator
+        print("Import successful via agentforge.core.orchestrator")
+    except ModuleNotFoundError as e:
+        print(f"Critical Import Error: {e}")
+        raise e
 import shutil
 import gspread # إضافة مكتبة الربط
 from google.oauth2.service_account import Credentials # إضافة مكتبة التصاريح
 from datetime import datetime # لإضافة الوقت والتاريخ
-import importlib
-import agentforge.core.orchestrator
-importlib.reload(agentforge.core.orchestrator)
+
 # كود تجريبي سريع تحت الـ Imports
 try:
     creds_info = st.secrets["gcp_service_account"]
