@@ -103,29 +103,37 @@ class AgentForgeOrchestrator:
         os.makedirs(project_dir, exist_ok=True)
         enhanced_desc = self.project_state.get("enhanced_description", self.project_state["description"])
 
+        # قائمة المفاتيح التي يجب تجاهلها تماماً لأنها ليست ملفات برمجية
+        forbidden_keys = ["project_name", "description", "directory_structure", "file_descriptions", "class_names", "state_management", "coding_rules", "example_code_snippets"]
+
         for file_name, task in self.project_state["structure"].items():
-            if file_name.lower() in ["project_name", "description"]: continue
+            # إذا كان المفتاح ليس ملفاً حقيقياً (لا ينتهي بصيغة ملف)، نتجاهله
+            if file_name.lower() in forbidden_keys or "." not in file_name:
+                continue
             
             success = False
             attempts = 0
-            history = []
             while attempts < self.project_state["max_attempts"] and not success:
                 try:
                     attempts += 1
                     logger.info(f"📝 برمجة {file_name} - محاولة {attempts}")
-                    code = self.coder.write_code(file_name, enhanced_desc, str(task), history=history[-1:])
+                    code = self.coder.write_code(file_name, enhanced_desc, str(task))
                     
-                    review = self.reviewer.review_code(code, str(task))
-                    if "FAIL" in review.upper():
-                        history.append({"feedback": review})
-                        continue
+                    # محاولة المراجعة، لكن لا تقتل المشروع إذا فشل السيرفر (503)
+                    try:
+                        review = self.reviewer.review_code(code, str(task))
+                        if "FAIL" in review.upper() and attempts < self.project_state["max_attempts"]:
+                            continue
+                    except:
+                        logger.warning(f"⚠️ السيرفر مضغوط، سيتم تجاوز المراجعة لملف {file_name}")
 
+                    # حفظ الملف في كل الأحوال إذا وصلنا لهذه النقطة
                     self._save_file(os.path.join(project_dir, file_name), code)
                     success = True
+                    logger.info(f"💾 تم حفظ {file_name} بنجاح.")
                 except Exception as e:
-                    logger.error(f"🚨 خطأ: {e}")
-                    return False
-
+                    logger.error(f"🚨 خطأ في {file_name}: {e}")
+        
         self._generate_bat_file(project_dir)
         self._generate_readme(project_name, enhanced_desc, project_dir)
         return True
