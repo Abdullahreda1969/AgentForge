@@ -33,6 +33,9 @@ class ArchitectAgent:
         5. ENTRY POINT: Ensure there is a clear main.py to launch the application.
         
         Output MUST be a raw JSON object ONLY. No preamble, no markdown code blocks.
+        
+        "Every project MUST include a README.md file. Use the standard professional template including: Project Name, Overview, Features, Installation (pip install -r requirements.txt), and Usage (How to run start_app.bat)."
+        
         """
     def design_project(self, name, description):
         logger.info(f"🧠 المصمم الاحترافي يخطط لمشروع: {name}...")
