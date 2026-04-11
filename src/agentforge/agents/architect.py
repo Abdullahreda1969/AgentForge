@@ -1,78 +1,84 @@
-from google import genai
 import os
 import json
-import logging # استيراد المكتبة
+import requests
+import logging
 from dotenv import load_dotenv
 
-# --- تعريف الـ logger لكي لا يظهر الخطأ ---
+# --- إعداد الـ Logging ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-# ---------------------------------------
 
 load_dotenv()
 
 class ArchitectAgent:
     def __init__(self):
-        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        # سحب المفتاح من البيئة الآمنة
+        self.api_key = os.getenv("GEMINI_API_KEY")
         self.model_id = "gemma-3-27b-it"
+        # الرابط المباشر للموديل
+        self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_id}:generateContent?key={self.api_key}"
         
-         # التعديل المطلوب في ArchitectAgent
         self.system_prompt = """
         You are a Senior Software Architect. Your goal is to design a clean, modular directory structure for Python projects.
 
         STRICT DESIGN RULES:
-        
         1. WEB FRAMEWORK: Use Streamlit for the UI. It is the best for our cloud environment.
-        
         2. STATE MANAGEMENT: For interactive apps, instruct the coder to use 'st.session_state' to store data. Avoid local file databases (like .db or .txt) unless explicitly asked.
-
         3. MODULARITY: Separate logic from data processing.
-
         4. NAMING: Use snake_case for filenames and PascalCase for Classes.
-
         5. ENTRY POINT: Ensure there is a clear main.py to launch the application.
         
         Output MUST be a raw JSON object ONLY. No preamble, no markdown code blocks.
-        
-        "Every project MUST include a README.md file. Use the standard professional template including: Project Name, Overview, Features, Installation (pip install -r requirements.txt), and Usage (How to run start_app.bat)."
-        
+        Every project MUST include a README.md file. Use the standard professional template.
         """
+
     def design_project(self, name, description):
         logger.info(f"🧠 المصمم الاحترافي يخطط لمشروع: {name}...")
         
-        # إضافة تعليمات مخصصة لكل طلب لتقليل الملفات
         user_context = f"Project: {name}\nGoal: {description}\nContext: Create a functional Python GUI application."
         full_prompt = f"{self.system_prompt}\n\n{user_context}"
         
+        payload = {
+            "contents": [{"parts": [{"text": full_prompt}]}],
+            "generationConfig": {
+                "temperature": 0.2, # درجة حرارة منخفضة لضمان الحصول على JSON سليم
+                "maxOutputTokens": 1024
+            }
+        }
+        
+        headers = {'Content-Type': 'application/json'}
+
         try:
-            response = self.client.models.generate_content(
-                model=self.model_id,
-                contents=full_prompt,
-            )
+            # استدعاء الموديل عبر requests بدلاً من مكتبة genai القديمة
+            response = requests.post(self.api_url, headers=headers, data=json.dumps(payload))
+            res_json = response.json()
             
-            structure = self._parse_json_response(response.text)
-            
-            # ضمان وجود الملفات الأساسية بتعليمات برمجية وليست وصفية
-            if "main.py" not in structure:
-                structure["main.py"] = "Create the main GUI entry point using tkinter."
-            if "start_app.bat" not in structure:
-                structure["start_app.bat"] = "python main.py"
+            if "candidates" in res_json:
+                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
+                structure = self._parse_json_response(raw_text)
                 
-            return structure
+                # ضمان وجود الملفات الأساسية
+                if "main.py" not in structure:
+                    structure["main.py"] = "Create the main GUI entry point using Streamlit."
+                if "start_app.bat" not in structure:
+                    structure["start_app.bat"] = "streamlit run main.py"
+                    
+                return structure
+            else:
+                raise Exception(res_json.get("error", {}).get("message", "فشل في الحصول على رد"))
 
         except Exception as e:
             logger.error(f"❌ خطأ في تواصل المصمم: {e}")
-            return {"main.py": "import tkinter as tk\nroot = tk.Tk()\nroot.mainloop()"}
+            return {"main.py": "import streamlit as st\nst.title('Failed to generate project structure')"}
 
     def _parse_json_response(self, text):
-        """دالة قوية لاستخراج الـ JSON حتى لو وجد نص غريب حوله"""
+        """دالة قوية لاستخراج الـ JSON وتطهيره من أي نص زائد"""
         try:
-            # محاولة التنظيف العادية
+            # تنظيف علامات الماركدوان إن وجدت
             clean_text = text.replace("```json", "").replace("```", "").strip()
             return json.loads(clean_text)
         except:
             try:
-                # محاولة البحث عن أول { وآخر } في حال وجود ثرثرة من الموديل
                 import re
                 match = re.search(r'(\{.*\})', text, re.DOTALL)
                 if match:
