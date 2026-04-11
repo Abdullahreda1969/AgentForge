@@ -17,6 +17,8 @@ class Reviewer:
         prompt = f"""
         You are a Lead QA Engineer. Your goal is to strictly review the following Python code.
         
+        "When reviewing, ensure the code follows the [STRATEGIC TEMPLATE] patterns if one was provided. Specifically, for Streamlit, reject any code that resets widget-linked keys outside of a callback function."
+        
         ---
         TARGET TASK: {task}
         PREVIOUS FAILURES (To avoid): {history if history else 'None'}
