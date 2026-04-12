@@ -31,7 +31,7 @@ class ArchitectAgent:
         - Always plan for a 'config.py' or 'utils.py' to manage API keys.
         - Design the logic to support both Local (dotenv) and Cloud (streamlit secrets) environments.
         - Ensure the structure includes a '.streamlit/secrets.toml' placeholder for local testing.
-
+        - Do not include .env in the project structure. The system will inject it automatically. However, you MUST ensure that config.py or the main file expects the API key from environment variables.
         "If a [STRATEGIC TEMPLATE] is provided, prioritize its architectural patterns."
         """
 
