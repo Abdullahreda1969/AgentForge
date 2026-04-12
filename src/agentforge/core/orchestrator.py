@@ -136,7 +136,28 @@ class AgentForgeOrchestrator:
         
         self._generate_bat_file(project_dir)
         self._generate_readme(project_name, enhanced_desc, project_dir)
+        
+        # --- 🚀 [حقن ملف المفاتيح تلقائياً] ---
+        try:
+            # ملف .env الموجود في المجلد الرئيسي لـ AgentForge
+            root_env = os.path.join(os.getcwd(), ".env")
+            # المسار المستهدف داخل مجلد المشروع المنتج
+            target_env = os.path.join(project_dir, ".env")
+            
+            if os.path.exists(root_env):
+                import shutil
+                shutil.copy(root_env, target_env)
+                logger.info(f"🔑 [SYSTEM] تم حقن ملف .env في المجلد: {project_name}")
+            else:
+                logger.warning("⚠️ ملف .env الرئيسي غير موجود، لم يتم حقن المفاتيح.")
+        except Exception as e:
+            logger.error(f"❌ فشل حقن المفتاح: {e}")
+        # -------------------------------------
+
+        self._generate_bat_file(project_dir)
+        self._generate_readme(project_name, enhanced_desc, project_dir)
         return True
+        
 
     def _generate_readme(self, project_name, description, project_dir):
         clean_desc = description.split("[STRATEGIC TEMPLATE]")[0].strip()
