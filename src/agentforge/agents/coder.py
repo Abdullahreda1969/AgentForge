@@ -31,7 +31,9 @@ class CoderAgent:
         3. PRODUCTION STANDARDS:
         - Use 'st.spinner' for long API calls to improve UX.
         - Use 'try-except' blocks for all 'requests.post' calls.
-        ...
+        
+        CRITICAL: Never access st.secrets directly because it raises an exception if the file is missing. Always wrap it in a try-except block or prioritize os.getenv first to ensure local compatibility.
+        
         """
 
     def write_code(self, file_name, project_desc, task_details, history=None):
