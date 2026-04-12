@@ -36,6 +36,7 @@ class Reviewer:
         15. CLOUD READINESS: FAIL if the code doesn't check 'st.secrets' for API keys.
         16. UX: FAIL if an AI-dependent app doesn't use a spinner or loading indicator during API calls.
         17. MODEL COMPLIANCE: FAIL if the code uses any model other than 'gemma-3-27b-it'. Specifically, search for and reject 'gemini-pro' or 'gemini-1.5-flash'.
+        18. SECRET CRASH PROTECTION: FAIL if st.secrets is accessed without a try-except block. This is a common cause of crashes in local environments.
         """
 
         full_prompt = (

@@ -34,6 +34,8 @@ class CoderAgent:
                   api_key = st.secrets["GEMINI_API_KEY"]
           except:
               pass
+        -CRITICAL RULE: Never call st.secrets or st.secrets.get() directly in the global scope or without a try-except block. Streamlit WILL CRASH if the secrets file is missing. Always prioritize os.getenv and use a fallback mechanism.
+        
         3. PRODUCTION STANDARDS:
         - Use 'st.spinner' for long API calls to improve UX.
         - Use 'try-except' blocks for all 'requests.post' calls.
