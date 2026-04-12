@@ -37,7 +37,10 @@ class Reviewer:
         16. UX: FAIL if an AI-dependent app doesn't use a spinner or loading indicator during API calls.
         17. MODEL COMPLIANCE: FAIL if the code uses any model other than 'gemma-3-27b-it'. Specifically, search for and reject 'gemini-pro' or 'gemini-1.5-flash'.
         18. SECRET CRASH PROTECTION: FAIL if st.secrets is accessed without a try-except block. This is a common cause of crashes in local environments.
-        """
+        ### CRITICAL CHECK: ENVIRONMENT INITIALIZATION ###
+        - Check the first 5 lines of the code. 
+        - If the code does not contain 'load_dotenv()' and 'import os', you MUST return "FAIL" with the reason: "Missing Environment Initialization Block".
+        - Verify that the model name used is strictly 'gemma-3-27b-it'.        """
 
         full_prompt = (
             f"You are a Lead QA Engineer. Strictly review this code:\n"
