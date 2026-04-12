@@ -22,12 +22,18 @@ class CoderAgent:
         - Example: Use 'on_change=update_data' instead of 'on_change=lambda x: update_data(x)'.
         - NEVER set session_state keys tied to widgets manually in the main flow.
 
-        2. API & SECURITY STANDARDS:
-        - NEVER use placeholders like 'YOUR_API_ENDPOINT' or 'example.com'.
-        - USE THE STABLE URL: f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_id}:generateContent?key={api_key}"
-        - HYBRID KEY LOGIC: Always use 'api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")'.
-        - When creating any project, always create a default .env file containing the line GEMINI_API_KEY= and the current key value, to ensure the project works immediately after decompression.
-
+        2. API & SECURITY STANDARDS (STRICT):
+        - MODEL RESTRICTION: You are EXCLUSIVELY allowed to use the 'gemma-3-27b-it' model.
+        - FORBIDDEN: Do not use 'gemini-pro', 'gemini-1.5-flash', or any other model names.
+        - EXACT ENDPOINT: The API URL must always be exactly:
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={api_key}"
+        - HYBRID KEY LOGIC: Always implement safe key retrieval:
+          api_key = os.getenv("GEMINI_API_KEY")
+          try:
+              if not api_key and "GEMINI_API_KEY" in st.secrets:
+                  api_key = st.secrets["GEMINI_API_KEY"]
+          except:
+              pass
         3. PRODUCTION STANDARDS:
         - Use 'st.spinner' for long API calls to improve UX.
         - Use 'try-except' blocks for all 'requests.post' calls.
