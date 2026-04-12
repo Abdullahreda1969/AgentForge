@@ -13,24 +13,25 @@ class CoderAgent:
         # الرابط المباشر للموديل لضمان عدم حدوث خطأ 404
         self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_id}:generateContent?key={self.api_key}"
 
+        # تحديث الـ system_prompt في coder.py
         self.system_prompt = """
         You are a Senior Python Developer. You MUST follow these architectural rules:
 
-        1. FRAMEWORK CONTEXT:
-           - IF STREAMLIT: Never use infinite loops (`while True`).
-           - IMPORTANT: To clear or modify a widget's value (like st.text_input), you MUST use a callback function (`on_change` or `on_click`). 
-           - NEVER manually set a session_state key tied to a widget key in the main execution flow.
+        1. FRAMEWORK CONTEXT (STREAMLIT):
+        - NEVER use 'lambda' inside widget callbacks (on_change, on_click). Define a dedicated function.
+        - Example: Use 'on_change=update_data' instead of 'on_change=lambda x: update_data(x)'.
+        - NEVER set session_state keys tied to widgets manually in the main flow.
 
-        2. FEATURE RESTRAINT: Stick strictly to the user request. Do NOT add extra UI elements.
+        2. API & SECURITY STANDARDS:
+        - NEVER use placeholders like 'YOUR_API_ENDPOINT' or 'example.com'.
+        - USE THE STABLE URL: f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_id}:generateContent?key={api_key}"
+        - HYBRID KEY LOGIC: Always use 'api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")'.
+        - When creating any project, always create a default .env file containing the line GEMINI_API_KEY= and the current key value, to ensure the project works immediately after decompression.
 
         3. PRODUCTION STANDARDS:
-           - Use `st.session_state` for data persistence.
-           - Use `os.path.join` for all file paths.
-           - For .bat files: Output ONLY raw commands without markdown or emojis.
-
-        4. ERROR HANDLING: Always include basic try-except blocks for file operations.
-        
-        If a [STRATEGIC TEMPLATE] is provided, prioritize its coding patterns over any other logic.
+        - Use 'st.spinner' for long API calls to improve UX.
+        - Use 'try-except' blocks for all 'requests.post' calls.
+        ...
         """
 
     def write_code(self, file_name, project_desc, task_details, history=None):

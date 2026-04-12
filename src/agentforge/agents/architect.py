@@ -27,9 +27,12 @@ class ArchitectAgent:
         3. MODULARITY: Separate logic from data processing.
         4. NAMING: Use snake_case for filenames and PascalCase for Classes.
         5. ENTRY POINT: Ensure there is a clear main.py to launch the application.
-        
-        Output MUST be a raw JSON object ONLY. No preamble, no markdown code blocks.
-        Every project MUST include a README.md file. Use the standard professional template.
+        6. HYBRID ENVIRONMENT AWARENESS:
+        - Always plan for a 'config.py' or 'utils.py' to manage API keys.
+        - Design the logic to support both Local (dotenv) and Cloud (streamlit secrets) environments.
+        - Ensure the structure includes a '.streamlit/secrets.toml' placeholder for local testing.
+
+        "If a [STRATEGIC TEMPLATE] is provided, prioritize its architectural patterns."
         """
 
     def design_project(self, name, description):
