@@ -126,12 +126,12 @@ class AgentForgeOrchestrator:
             print(f"[ERROR] Injection failed: {e}")
     def _run_coding_phase(self):
         # 1. أولاً: نقوم بحقن الملف قبل أن يبدأ الـ Coder بعمله
-        self._inject_env_file(project_dir)
         project_name = self.project_state["name"]
         project_dir = os.path.join(os.getcwd(), "projects", project_name)
         os.makedirs(project_dir, exist_ok=True)
+        # 2. الآن نقوم بحقن الملف بعد أن أصبح project_dir معروفاً
+        self._inject_env_file(project_dir)
         enhanced_desc = self.project_state.get("enhanced_description", self.project_state["description"])
-
         # قائمة المفاتيح التي يجب تجاهلها تماماً لأنها ليست ملفات برمجية
         forbidden_keys = ["project_name", "description", "directory_structure", "file_descriptions", "class_names", "state_management", "coding_rules", "example_code_snippets"]
 

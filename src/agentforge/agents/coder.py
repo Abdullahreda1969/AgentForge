@@ -22,19 +22,11 @@ class CoderAgent:
             - Example: Use 'on_change=update_data' instead of 'on_change=lambda x: update_data(x)'.
             - NEVER set session_state keys tied to widgets manually in the main flow.
 
+        # بدلاً من الفقرة القديمة في القسم 2، اجعلها هكذا:
         2. API & SECURITY STANDARDS (STRICT):
-            - MODEL RESTRICTION: You are EXCLUSIVELY allowed to use the 'gemma-3-27b-it' model.
-            - FORBIDDEN: Do not use 'gemini-pro', 'gemini-1.5-flash', or any other model names.
-            - EXACT ENDPOINT: The API URL must always be exactly:
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={api_key}"
-            - HYBRID KEY LOGIC: Always implement safe key retrieval:
-            api_key = os.getenv("GEMINI_API_KEY")
-            try:
-                if not api_key and "GEMINI_API_KEY" in st.secrets:
-                    api_key = st.secrets["GEMINI_API_KEY"]
-            except:
-                pass
-            -CRITICAL RULE: Never call st.secrets or st.secrets.get() directly in the global scope or without a try-except block. Streamlit WILL CRASH if the secrets file is missing. Always prioritize os.getenv and use a fallback mechanism.
+            - MODEL RESTRICTION: Use strictly 'gemma-3-27b-it'.
+            - KEY ACCESS: You MUST only use os.getenv("GEMINI_API_KEY"). 
+            - No direct access to st.secrets unless os.getenv fails.
         
         3. PRODUCTION STANDARDS:
             - Use 'st.spinner' for long API calls to improve UX.
