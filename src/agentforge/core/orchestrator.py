@@ -5,27 +5,11 @@ import datetime
 import json
 import os
 import shutil
-
-# تحديد مكان orchestrator.py
-current_dir = os.path.dirname(os.path.abspath(__file__)) 
-
-# الصعود 3 مستويات: core -> agentforge -> src -> AgentForge
-# المستوى الأول: core
-# المستوى الثاني: agentforge
-# المستوى الثالث: src
-# المستوى الرابع: AgentForge (المجلد الرئيسي)
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_dir))))
-
-# الآن نحدد مسار الـ .env الرئيسي
-root_env = os.path.join(project_root, ".env")
-
-# استيرادات الوكلاء
 from agentforge.agents.architect import ArchitectAgent
 from agentforge.agents.coder import CoderAgent
 from agentforge.agents.tester import TesterAgent
 from agentforge.agents.executor import ExecutorAgent
 from agentforge.agents.reviewer import Reviewer
-
 # إعدادات الطباعة والسجل
 sys.stdout.reconfigure(encoding='utf-8')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -109,8 +93,40 @@ class AgentForgeOrchestrator:
         self.project_state["duration"] = int(time.time() - start_time)
         self.project_state["status"] = "completed" if success else "failed"
         return self.project_state
+    def _inject_env_file(self, project_dir):
+        """دالة البحث الصارم عن المفتاح وحقنه"""
+        try:
+            # نبدأ من مسار ملف الـ orchestrator الحالي
+            current_path = os.path.abspath(__file__)
+            base_path = current_path
+            root_env = None
 
+            # البحث عن مجلد AgentForge صعوداً
+            while "AgentForge" in base_path:
+                potential_env = os.path.join(base_path, ".env")
+                if os.path.exists(potential_env):
+                    root_env = potential_env
+                    break
+                
+                parent = os.path.dirname(base_path)
+                if parent == base_path: break # وصلنا لجذر القرص ولم نجد شيئاً
+                base_path = parent
+
+            if root_env:
+                # --- هنا مكان سطر الطباعة الذي سيكشف لنا الحقيقة ---
+                logger.info(f"🔍 I found the key here: {root_env}")                
+                target_env = os.path.join(project_dir, ".env")
+                import shutil
+                shutil.copy(root_env, target_env)
+                print(f"[DEBUG] Successfully injected to: {target_env}\n")
+            else:
+                print(f"\n[ERROR] Master .env NOT FOUND in any parent directory of AgentForge!\n")
+
+        except Exception as e:
+            print(f"[ERROR] Injection failed: {e}")
     def _run_coding_phase(self):
+        # 1. أولاً: نقوم بحقن الملف قبل أن يبدأ الـ Coder بعمله
+        self._inject_env_file(project_dir)
         project_name = self.project_state["name"]
         project_dir = os.path.join(os.getcwd(), "projects", project_name)
         os.makedirs(project_dir, exist_ok=True)
@@ -147,28 +163,6 @@ class AgentForgeOrchestrator:
                 except Exception as e:
                     logger.error(f"🚨 خطأ في {file_name}: {e}")
         
-        self._generate_bat_file(project_dir)
-        self._generate_readme(project_name, enhanced_desc, project_dir)
-        
-        # --- 🚀 نظام الحقن الذكي ---
-        try:
-            # الوصول للمجلد الرئيسي ديناميكياً
-            current_file = os.path.abspath(__file__)
-            # نصعد 4 مرات لنصل من core إلى المجلد الرئيسي AgentForge
-            master_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
-            root_env = os.path.join(master_dir, ".env")
-            
-            target_env = os.path.join(project_dir, ".env")
-            
-            if os.path.exists(root_env):
-                shutil.copy(root_env, target_env)
-                logger.info(f"✅ [SYSTEM] تم سحب المفتاح من المجلد الرئيسي وحقنه في: {project_name}")
-            else:
-                logger.warning(f"⚠️ لم يتم العثور على المفتاح في المسار المتوقع: {root_env}")
-        except Exception as e:
-            logger.error(f"❌ خطأ في تحديد مسار المفتاح: {e}")
-            
-            
         self._generate_bat_file(project_dir)
         self._generate_readme(project_name, enhanced_desc, project_dir)
         return True
