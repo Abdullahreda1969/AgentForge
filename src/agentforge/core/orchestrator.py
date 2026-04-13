@@ -102,7 +102,7 @@ class AgentForgeOrchestrator:
             root_env = None
 
             # البحث عن مجلد AgentForge صعوداً
-            while "AgentForge" in base_path:
+            while "AgentForge" in base_path.lower():
                 potential_env = os.path.join(base_path, ".env")
                 if os.path.exists(potential_env):
                     root_env = potential_env

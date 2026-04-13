@@ -18,6 +18,7 @@ class Reviewer:
         
         # استخدمنا نصاً عادياً للقواعد لضمان عدم تداخل الأقواس مع f-string
         rejection_criteria = """
+        RESPONSE FORMAT: You must return ONLY a valid JSON object. Do not include markdown code blocks like json ...  or any conversational text. Start your response with { and end with }.
         🛑 REJECTION CRITERIA (FAIL if any of these are met):
         1. BUTTON LOGIC: FAIL if any button is not connected to a meaningful function.
         2. DATA INTEGRITY: FAIL if JSON/Data loading is not robust.
