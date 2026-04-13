@@ -1,10 +1,23 @@
 import logging
 import sys
-import os
 import time
 import datetime
 import json
+import os
 import shutil
+
+# تحديد مكان orchestrator.py
+current_dir = os.path.dirname(os.path.abspath(__file__)) 
+
+# الصعود 3 مستويات: core -> agentforge -> src -> AgentForge
+# المستوى الأول: core
+# المستوى الثاني: agentforge
+# المستوى الثالث: src
+# المستوى الرابع: AgentForge (المجلد الرئيسي)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_dir))))
+
+# الآن نحدد مسار الـ .env الرئيسي
+root_env = os.path.join(project_root, ".env")
 
 # استيرادات الوكلاء
 from agentforge.agents.architect import ArchitectAgent
@@ -137,23 +150,25 @@ class AgentForgeOrchestrator:
         self._generate_bat_file(project_dir)
         self._generate_readme(project_name, enhanced_desc, project_dir)
         
-        # --- 🚀 [حقن ملف المفاتيح تلقائياً] ---
+        # --- 🚀 نظام الحقن الذكي ---
         try:
-            # ملف .env الموجود في المجلد الرئيسي لـ AgentForge
-            root_env = os.path.join(os.getcwd(), ".env")
-            # المسار المستهدف داخل مجلد المشروع المنتج
+            # الوصول للمجلد الرئيسي ديناميكياً
+            current_file = os.path.abspath(__file__)
+            # نصعد 4 مرات لنصل من core إلى المجلد الرئيسي AgentForge
+            master_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
+            root_env = os.path.join(master_dir, ".env")
+            
             target_env = os.path.join(project_dir, ".env")
             
             if os.path.exists(root_env):
-                import shutil
                 shutil.copy(root_env, target_env)
-                logger.info(f"🔑 [SYSTEM] تم حقن ملف .env في المجلد: {project_name}")
+                logger.info(f"✅ [SYSTEM] تم سحب المفتاح من المجلد الرئيسي وحقنه في: {project_name}")
             else:
-                logger.warning("⚠️ ملف .env الرئيسي غير موجود، لم يتم حقن المفاتيح.")
+                logger.warning(f"⚠️ لم يتم العثور على المفتاح في المسار المتوقع: {root_env}")
         except Exception as e:
-            logger.error(f"❌ فشل حقن المفتاح: {e}")
-        # -------------------------------------
-
+            logger.error(f"❌ خطأ في تحديد مسار المفتاح: {e}")
+            
+            
         self._generate_bat_file(project_dir)
         self._generate_readme(project_name, enhanced_desc, project_dir)
         return True
