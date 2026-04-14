@@ -13,37 +13,26 @@ class CoderAgent:
         # الرابط المباشر للموديل لضمان عدم حدوث خطأ 404
         self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_id}:generateContent?key={self.api_key}"
 
-        # تحديث الـ system_prompt في coder.py
         self.system_prompt = """
-        You are a Senior Python Developer. You MUST follow these architectural rules:
-        RESPONSE FORMAT: You must return ONLY a valid JSON object. Do not include markdown code blocks like json ...  or any conversational text. Start your response with { and end with }.
-        1. FRAMEWORK CONTEXT (STREAMLIT):
-            - NEVER use 'lambda' inside widget callbacks (on_change, on_click). Define a dedicated function.
-            - Example: Use 'on_change=update_data' instead of 'on_change=lambda x: update_data(x)'.
-            - NEVER set session_state keys tied to widgets manually in the main flow.
+        You are an Expert Python Developer. Your response MUST be a valid JSON object.
+        FORMAT RULE: Start with '{' and end with '}'. Do not use markdown blocks like ```json.
 
-        # بدلاً من الفقرة القديمة في القسم 2، اجعلها هكذا:
-        2. API & SECURITY STANDARDS (STRICT):
-            - MODEL RESTRICTION: Use strictly 'gemma-3-27b-it'.
-            - KEY ACCESS: You MUST only use os.getenv("GEMINI_API_KEY"). 
-            - No direct access to st.secrets unless os.getenv fails.
-        
-        3. PRODUCTION STANDARDS:
-            - Use 'st.spinner' for long API calls to improve UX.
-            - Use 'try-except' blocks for all 'requests.post' calls.
-        
-            CRITICAL: Never access st.secrets directly because it raises an exception if the file is missing. Always wrap it in a try-except block or prioritize os.getenv first to ensure local compatibility.
-        4.    ### BOOTSTRAP & ENVIRONMENT RULE (STRICT COMPLIANCE) ###
-            1. MANDATORY HEADER: Every Python script you generate MUST begin with the following environment initialization block:
-            
-            import os
-            from dotenv import load_dotenv
-            load_dotenv()
+        STRICT CODE RULES:
+        1. MANDATORY HEADER: Every Python file MUST start with:
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
 
-            2. KEY RETRIEVAL: You are strictly forbidden from hardcoding API keys. Access the Gemini API key ONLY via: os.getenv("GEMINI_API_KEY").
-            3. LOGGING: Include a print or streamlit success message to confirm the key is loaded, e.g., print("API Key Loaded Successfully").
-            4. FAIL-SAFE: If 'load_dotenv()' or 'import os' is missing, the code is considered non-compliant and will be rejected.        """
+        2. API KEY ACCESS: Use ONLY 'os.getenv("GEMINI_API_KEY")'. 
+        3. STREAMLIT SAFETY: Always wrap 'st.secrets' in try-except blocks. Prioritize 'os.getenv'.
+        4. NO LAMBDAS: In Streamlit callbacks, use named functions, never lambdas.
 
+        OUTPUT STRUCTURE:
+        {
+        "file_name": "name.py",
+        "code": "... full python code here ..."
+        }
+        """
     def write_code(self, file_name, project_desc, task_details, history=None):
         """
         history: قائمة تحتوي على محاولات الفشل السابقة وردود فعل المراجع.

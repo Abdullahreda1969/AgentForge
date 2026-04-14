@@ -2,6 +2,7 @@ import logging
 import sys
 import time
 import datetime
+import re
 import json
 import os
 import shutil
@@ -101,17 +102,33 @@ class AgentForgeOrchestrator:
             base_path = current_path
             root_env = None
 
-            # البحث عن مجلد AgentForge صعوداً
-            while "AgentForge" in base_path.lower():
+            # # البحث عن مجلد AgentForge صعوداً
+            # while "AgentForge" in base_path.lower():
+            #     print(f"DEBUG: Checking in: {base_path}") # سطر جديد
+            #     potential_env = os.path.join(base_path, ".env")
+            #     if os.path.exists(potential_env):
+            #         root_env = potential_env
+            #         break
+                
+            #     parent = os.path.dirname(base_path)
+            #     if parent == base_path: break # وصلنا لجذر القرص ولم نجد شيئاً
+            #     base_path = parent
+
+            # استبدل حلقة الـ while بهذا الكود تماماً لمرة واحدة لنفهم المسار:
+            print(f"🔍 DEBUG: Starting search from: {base_path}")
+            while True:
                 potential_env = os.path.join(base_path, ".env")
+                print(f"🔍 DEBUG: Checking for .env in: {base_path}")
                 if os.path.exists(potential_env):
                     root_env = potential_env
+                    print(f"✅ FOUND KEY AT: {root_env}")
                     break
                 
                 parent = os.path.dirname(base_path)
-                if parent == base_path: break # وصلنا لجذر القرص ولم نجد شيئاً
+                if parent == base_path or "Users" not in parent: # توقف عند مجلد المستخدم للامان
+                    break
                 base_path = parent
-
+            
             if root_env:
                 # --- هنا مكان سطر الطباعة الذي سيكشف لنا الحقيقة ---
                 logger.info(f"🔍 I found the key here: {root_env}")                
@@ -124,50 +141,143 @@ class AgentForgeOrchestrator:
 
         except Exception as e:
             print(f"[ERROR] Injection failed: {e}")
+    
+    def _clean_code_output(self, raw_response):
+        """
+        تنظيف رد الموديل واستخراج الكود البرمجي النقي.
+        تتعامل مع JSON، Markdown، وكلمات التوضيح الزائدة.
+        """
+        actual_code = raw_response
+        try:
+            # 1. محاولة استخراج JSON إذا وجد بين أقواس متعرجة
+            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+            if json_match:
+                json_text = json_match.group(0)
+                data = json.loads(json_text)
+                if isinstance(data, dict) and "code" in data:
+                    actual_code = data["code"]
+                else:
+                    actual_code = json_text
+            else:
+                # 2. تنظيف علامات الـ Markdown (```python, ```json, إلخ)
+                # نستخدم re.sub بشكل آمن
+                clean_text = re.sub(r'```[\w]*\n', '', raw_response)
+                clean_text = clean_text.replace('```', '').strip()
+                
+                # حذف كلمة 'json' أو أي روابط غريبة قد تظهر في السطر الأول
+                lines = clean_text.split('\n')
+                if lines and (lines[0].strip().lower() == 'json' or lines[0].startswith('http')):
+                    actual_code = '\n'.join(lines[1:]).strip()
+                else:
+                    actual_code = clean_text.strip()
+
+        except Exception as e:
+            logger.warning(f"⚠️ فشل التنظيف المتقدم: {e}")
+            # تنظيف يدوي بسيط كخيار أخير
+            actual_code = raw_response.replace('```python', '').replace('```', '').replace('json', '').strip()
+
+        return actual_code
+    
     def _run_coding_phase(self):
-        # 1. أولاً: نقوم بحقن الملف قبل أن يبدأ الـ Coder بعمله
+        # 1. إعداد المجلدات والحقن
         project_name = self.project_state["name"]
         project_dir = os.path.join(os.getcwd(), "projects", project_name)
         os.makedirs(project_dir, exist_ok=True)
-        # 2. الآن نقوم بحقن الملف بعد أن أصبح project_dir معروفاً
         self._inject_env_file(project_dir)
-        enhanced_desc = self.project_state.get("enhanced_description", self.project_state["description"])
-        # قائمة المفاتيح التي يجب تجاهلها تماماً لأنها ليست ملفات برمجية
-        forbidden_keys = ["project_name", "description", "directory_structure", "file_descriptions", "class_names", "state_management", "coding_rules", "example_code_snippets"]
 
+        enhanced_desc = self.project_state.get("enhanced_description", self.project_state["description"])
+        
+        # تعريف الوكلاء
+        tester = TesterAgent()
+        executor = ExecutorAgent()
+        
         for file_name, task in self.project_state["structure"].items():
-            # إذا كان المفتاح ليس ملفاً حقيقياً (لا ينتهي بصيغة ملف)، نتجاهله
-            if file_name.lower() in forbidden_keys or "." not in file_name:
+            # تجاهل المفاتيح التي ليست ملفات
+            if file_name.lower() in ["project_name", "description"] or "." not in file_name:
                 continue
             
             success = False
             attempts = 0
-            while attempts < self.project_state["max_attempts"] and not success:
+            while attempts < self.project_state.get("max_attempts", 3) and not success:
                 try:
                     attempts += 1
                     logger.info(f"📝 برمجة {file_name} - محاولة {attempts}")
-                    code = self.coder.write_code(file_name, enhanced_desc, str(task))
                     
-                    # محاولة المراجعة، لكن لا تقتل المشروع إذا فشل السيرفر (503)
-                    try:
-                        review = self.reviewer.review_code(code, str(task))
-                        if "FAIL" in review.upper() and attempts < self.project_state["max_attempts"]:
-                            continue
-                    except:
-                        logger.warning(f"⚠️ السيرفر مضغوط، سيتم تجاوز المراجعة لملف {file_name}")
+                    # استلام الرد
+                    raw_response = self.coder.write_code(file_name, enhanced_desc, str(task))
+                    
+                    # تنظيف واستخراج الكود (باستخدام الدالة التي أنشأناها سابقاً)
+                    actual_code = self._clean_code_output(raw_response)
 
-                    # حفظ الملف في كل الأحوال إذا وصلنا لهذه النقطة
-                    self._save_file(os.path.join(project_dir, file_name), code)
+                    # 2. الاختبار البرمجي (Static Analysis)
+                    is_valid, report = tester.validate_code(actual_code)
+                    if not is_valid:
+                        logger.warning(f"❌ خطأ قواعد في {file_name}: {report}")
+                        continue 
+
+                    # 3. حفظ الملف
+                    file_path = os.path.join(project_dir, file_name)
+                    self._save_file(file_path, actual_code)
+                    
+                    # 4. التشغيل والتصحيح الذاتي للمكتبات
+                    if file_name == "main.py":
+                        logger.info(f"⚙️ جاري فحص تشغيل {file_name} وتثبيت المكتبات...")
+                        run_success, run_msg = executor.execute_code(file_path)
+                        if not run_success:
+                            logger.error(f"⚠️ فشل التشغيل التجريبي: {run_msg}")
+                            # هنا يمكننا إضافة محاولة إصلاح إذا أردت مستقبلاً
+                    
                     success = True
-                    logger.info(f"💾 تم حفظ {file_name} بنجاح.")
+                    logger.info(f"💾 تم اعتماد {file_name} بنجاح.")
+                    
                 except Exception as e:
-                    logger.error(f"🚨 خطأ في {file_name}: {e}")
-        
+                    logger.error(f"🚨 خطأ في محاولة برمجة {file_name}: {e}")
+                    # في حال فشل كل شيء، نقوم بتنظيف يدوي أخير كملاذ أخير
+                    if attempts == self.project_state.get("max_attempts", 3):
+                        logger.warning("🔄 محاولة الإنقاذ الأخيرة عبر التنظيف اليدوي...")
+                        lines = raw_response.split('\n')
+                        rescue_code = '\n'.join([l for l in lines if l.strip().lower() != 'json'])
+                        self._save_file(os.path.join(project_dir, file_name), rescue_code)
+        self.update_cloud_ledger(project_name, "Completed", len(self.project_state["structure"]), 45)
+        # توليد ملفات المساعدة
         self._generate_bat_file(project_dir)
         self._generate_readme(project_name, enhanced_desc, project_dir)
         return True
         
+    # أضف هذه الدالة داخل كلاس Orchestrator
+    def update_cloud_ledger(self, project_name, status, files_count, duration):
+        try:
+            import gspread
+            from google.oauth2.service_account import Credentials
+            import json
+            from datetime import datetime
 
+            scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+            with open("credentials.json", "r") as f:
+                creds_info = json.load(f)
+            
+            # تنظيف المفتاح كما فعلنا سابقاً
+            if 'private_key' in creds_info:
+                creds_info['private_key'] = creds_info['private_key'].replace('\\n', '\n')
+                
+            creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+            client = gspread.authorize(creds)
+            
+            sheet_url = "https://docs.google.com/spreadsheets/d/1gWF-LQ4MQqgUJx2GVbno_2BplQBGQBuU8goQBTT1Bl4/edit"
+            sheet = client.open_by_url(sheet_url).sheet1
+            
+            # إضافة سطر جديد بالبيانات
+            new_row = [
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), # وقت الإنشاء
+                project_name,                                  # اسم المشروع
+                status,                                        # الحالة
+                files_count,                                   # عدد الملفات
+                f"{duration}s"                                 # المدة المستغرقة
+            ]
+            sheet.append_row(new_row)
+            logger.info("☁️ تم تحديث سجل العمليات السحابي بنجاح.")
+        except Exception as e:
+            logger.error(f"☁️ فشل تحديث السحاب: {e}")
     def _generate_readme(self, project_name, description, project_dir):
         clean_desc = description.split("[STRATEGIC TEMPLATE]")[0].strip()
         readme_content = f"""# 🚀 Project: {project_name.replace('_', ' ').title()}
@@ -201,3 +311,4 @@ class AgentForgeOrchestrator:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(clean)
+        

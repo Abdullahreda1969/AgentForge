@@ -23,11 +23,19 @@ from google.oauth2.service_account import Credentials # إضافة مكتبة ا
 from datetime import datetime # لإضافة الوقت والتاريخ
 
 # كود تجريبي سريع تحت الـ Imports
+# كود التحقق المطور ليدعم المحلي والسحاب
 try:
-    creds_info = st.secrets["gcp_service_account"]
-    st.sidebar.success("✅ تم العثور على صلاحيات Google Sheets")
+    if "gcp_service_account" in st.secrets:
+        st.sidebar.success("✅ متصل عبر السحاب (Secrets)")
+    elif os.path.exists("credentials.json"):
+        st.sidebar.success("✅ متصل محلياً (credentials.json)")
+    else:
+        st.sidebar.error("❌ صلاحيات Google Sheets مفقودة")
 except Exception:
-    st.sidebar.error("❌ صلاحيات Google Sheets مفقودة في Secrets")
+    if os.path.exists("credentials.json"):
+        st.sidebar.success("✅ متصل محلياً (credentials.json)")
+    else:
+        st.sidebar.error("❌ صلاحيات Google Sheets مفقودة")
 
 # --- إعداد المسارات لضمان رؤية المجلدات في السحابة ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -40,9 +48,26 @@ from agentforge.core.orchestrator import AgentForgeOrchestrator
 # 1️⃣ دالة تسجيل البيانات في Google Sheets (الإضافة الجديدة)
 def log_to_sheets(project_name, status, file_count, duration):
     try:
-        # قراءة البيانات من Secrets السحابية بدلاً من ملف JSON محلي
-        creds_info = st.secrets["gcp_service_account"]
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds_info = None
+
+        # 1. محاولة جلب البيانات من السحاب أولاً
+        try:
+            creds_info = dict(st.secrets["gcp_service_account"])
+        except Exception:
+            # 2. إذا فشل (تشغيل محلي)، جلب البيانات من ملف JSON
+            if os.path.exists("credentials.json"):
+                import json
+                with open("credentials.json", "r") as f:
+                    creds_info = json.load(f)
+        
+        if not creds_info:
+            return False
+
+        # 3. تنظيف المفتاح (الحل السحري الذي اكتشفناه اليوم)
+        if 'private_key' in creds_info:
+            creds_info['private_key'] = creds_info['private_key'].replace('\\n', '\n')
+            
         creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
         client = gspread.authorize(creds)
         
@@ -59,12 +84,7 @@ def log_to_sheets(project_name, status, file_count, duration):
         sheet.append_row(new_row)
         return True
     except Exception as e:
-        # إذا فشل السحابي (مثلاً أثناء التجربة المحلية)، جرب الملف المحلي
-        try:
-             creds = Credentials.from_service_account_file("credentials.json", scopes=["https://www.googleapis.com/auth/spreadsheets"])
-             # ... تكملة الكود للمحلي ...
-        except:
-             st.error(f"⚠️ فشل التسجيل: {e}")
+        st.error(f"⚠️ فشل المزامنة مع Google Sheets: {e}")
         return False
 
 def create_zip(project_name):

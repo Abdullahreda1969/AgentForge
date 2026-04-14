@@ -8,10 +8,16 @@ __pycache__/
 *.pyo
 *.pyd
 
+# --- Security & Credentials (CRITICAL) ---
+# حماية مفاتيح جوجل والبيئة من الرفع
+credentials.json
+keys.json
+.env
+secrets.toml
+
 # --- AgentForge Projects (The Generated Content) ---
-# هذا السطر سيتجاهل أي مجلد داخل مجلد projects ليبقى المحرك نظيفاً
+# تجاهل المشاريع المولدة ليبقى المستودع خفيفاً
 projects/*
-# استثناء ملف .gitkeep إذا كنت تريد بقاء المجلد فارغاً على GitHub
 !projects/.gitkeep
 
 # --- IDE & System Files ---
@@ -24,5 +30,5 @@ Thumbs.db
 # --- Data & Temp Files ---
 *.db
 *.csv
-*.json
-!gui_rules.md  # تأكد من عدم تجاهل ملف القواعد لأنه جزء من المحرك
+# حذفنا *.json العامة وأبقينا حماية الملفات السرية بالاسم أعلاه
+!gui_rules.md
