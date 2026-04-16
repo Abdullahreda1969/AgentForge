@@ -6,11 +6,11 @@ import re
 import json
 import os
 import shutil
-from agentforge.agents.architect import ArchitectAgent
-from agentforge.agents.coder import CoderAgent
-from agentforge.agents.tester import TesterAgent
-from agentforge.agents.executor import ExecutorAgent
-from agentforge.agents.reviewer import Reviewer
+from src.agentforge.agents.architect import ArchitectAgent
+from src.agentforge.agents.coder import CoderAgent
+from src.agentforge.agents.executor import ExecutorAgent
+from src.agentforge.agents.reviewer import Reviewer
+from src.agentforge.agents.tester import TesterAgent
 # إعدادات الطباعة والسجل
 sys.stdout.reconfigure(encoding='utf-8')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,7 +34,13 @@ class AgentForgeOrchestrator:
             "status": "initialized",
             "duration": 0
         }
-
+    def _load_gui_rules(self):
+        """قراءة الدستور البرمجي المحلي لتعزيز مناعة الوكلاء"""
+        rules_path = "gui_rules.md"
+        if os.path.exists(rules_path):
+            with open(rules_path, "r", encoding="utf-8") as f:
+                return f"\n\n[MANDATORY GUI RULES]:\n{f.read()}"
+        return ""
     def _get_template_content(self, template_type, description):
         """تبحث عن ملف القالب وتقرأ محتواه"""
         template_folder = "templates"
@@ -55,45 +61,155 @@ class AgentForgeOrchestrator:
                 return f.read()
         return "Template file not found, proceeding with default logic."
     
-    def start_cycle(self, project_name, description, lang="python", auto_run=True, max_attempts=3, template="auto"):
-        """الدالة الأساسية مع دعم نظام القوالب"""
-        start_time = time.time()
-        self.history = [] 
-        
-        template_context = self._get_template_content(template, description)
-        enhanced_desc = f"{description}\n\n[STRATEGIC TEMPLATE]:\n{template_context}"
-        
-        self.project_state.update({
-            "name": project_name,
-            "description": description,
-            "enhanced_description": enhanced_desc,
-            "template_used": template,
-            "status": "designing",
-            "max_attempts": max_attempts,
-            "auto_run": auto_run
-        })
-
+    def start_cycle(self, project_name, description, template="auto"):
         logger.info(f"🚀 بدء المحاكاة: {project_name} | القالب: {template}")
+        
+        # 1. المرحلة الأولى: التصميم
+        structure = self.architect.design_project(project_name, description)
+        project_path = os.path.join("projects", project_name)
+        os.makedirs(project_path, exist_ok=True)
 
-        try:
-            structure_raw = self.architect.design_project(project_name, enhanced_desc)
-            if isinstance(structure_raw, str):
-                clean_json = structure_raw.replace("```json", "").replace("```", "").strip()
-                structure = json.loads(clean_json)
-            else:
-                structure = structure_raw            
+        # حقن مفتاح الـ API في المشروع الجديد
+        self._inject_env_file(project_path)
 
-            self.project_state["structure"] = structure
-            logger.info(f"✅ تم تصميم الهيكل: {len(structure)} ملفات.")
+        # --- التعديل الجديد: مخزن الأكواد المعتمدة لضمان التكامل ---
+        approved_codes = {} 
+
+        # 2. المرحلة الثانية: البرمجة والمراجعة بالتسلسل
+        for file_name, task_details in structure.items():
+            success = False
+            attempts = 0
+            max_attempts = 3
+            history = []
+
+            logger.info(f"📝 برمجة {file_name}...")
+
+            while not success and attempts < max_attempts:
+        
+                attempts += 1
+                
+                # المبرمج يكتب الكود
+                current_code = self.coder.write_code(
+                    file_name=file_name,
+                    project_desc=description,
+                    task_details=task_details,
+                    history=history
+                )
+
+                # التحقق الأولي (Syntax Test)
+                valid, msg = self.tester.validate_code(current_code, file_name)
+                if not valid:
+                    logger.warning(f"⚠️ فشل الفحص النحوي لـ {file_name}: {msg}")
+                    history.append(f"Syntax Error: {msg}")
+                    continue
+
+                # --- التعديل الجوهري هنا: إرسال الأكواد السابقة كمرجع للمراجع ---
+                # نجمع كل الأكواد التي تم قبولها سابقاً في نص واحد
+                integration_context = "--- PREVIOUSLY APPROVED FILES (Use for consistency) ---\n"
+                for name, code in approved_codes.items():
+                    integration_context += f"\nFile [{name}]:\n{code}\n"
+
+                # المراجع يقوم بفحص الكود الحالي بناءً على ما سبقه
+                review_result = self.reviewer.review_code(
+                    code=current_code,
+                    task=task_details,
+                    history=integration_context if approved_codes else None
+                )
+
+                if "PASS" in review_result:
+                    # حفظ الكود في قائمة المعتمدات ليراه الوكلاء في الملفات القادمة
+                    approved_codes[file_name] = current_code
+                    
+                    # حفظ الملف فعلياً على القرص
+                    file_path = os.path.join(project_path, file_name)
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(current_code)
+                    
+                    logger.info(f"💾 تم اعتماد {file_name} بنجاح بعد المراجعة.")
+                    success = True
+                else:
+                    logger.warning(f"❌ المراجع رفض {file_name} (محاولة {attempts}):\n{review_result}")
+                    history.append(f"Reviewer Feedback: {review_result}")
+            if not success:
+                logger.error(f"🚫 فشل النظام في إنتاج ملف {file_name} سليم بعد {max_attempts} محاولات. توقف العمل.")
+                return {"status": "failed", "reason": f"File {file_name} rejected by reviewer."}
+        # 3. المرحلة الثالثة: التنفيذ النهائي (اختياري)
+        if "main.py" in approved_codes:
+            logger.info("⚙️ فحص تشغيل التطبيق النهائي...")
+            main_path = os.path.join(project_path, "main.py")
+            exec_success, exec_msg = self.executor.execute_code(main_path)
             
-        except Exception as e:
-            logger.error(f"❌ خطأ التصميم: {e}")
-            return {"status": "failed", "error": str(e)}
+        logger.info(f"✅ اكتمل بناء المشروع في: {project_path}")
+        return {"status": "completed", "path": project_path}
+    def _reorder_files(self, structure):
+        """إعادة ترتيب الملفات بحيث يتم برمجة المنطق قبل الواجهة"""
+        priority = []
+        others = []
+        gui = []
+        
+        for file_name in structure.keys():
+            if any(x in file_name.lower() for x in ['config', 'env', 'logic', 'helpers']):
+                priority.append(file_name)
+            elif file_name.lower() in ['main.py', 'app.py']:
+                gui.append(file_name)
+            else:
+                others.append(file_name)
+        
+        new_structure = {}
+        for f in priority + others + gui:
+            new_structure[f] = structure[f]
+        return new_structure
+    def _run_coding_phase(self):
+        project_name = self.project_state["name"]
+        project_dir = os.path.join(os.getcwd(), "projects", project_name)
+        os.makedirs(project_dir, exist_ok=True)
+        self._inject_env_file(project_dir)
 
-        success = self._run_coding_phase()
-        self.project_state["duration"] = int(time.time() - start_time)
-        self.project_state["status"] = "completed" if success else "failed"
-        return self.project_state
+        enhanced_desc = self.project_state["enhanced_description"]
+        
+        for file_name, task in self.project_state["structure"].items():
+            if "." not in file_name: continue
+            
+            success = False
+            attempts = 0
+            while attempts < self.project_state.get("max_attempts", 3) and not success:
+                try:
+                    attempts += 1
+                    logger.info(f"📝 برمجة {file_name} - محاولة {attempts}")
+                    
+                    raw_response = self.coder.write_code(file_name, enhanced_desc, str(task))
+                    actual_code = self._clean_code_output(raw_response)
+
+                    # --- إصلاح: فحص الملفات البرمجية فقط ---
+                    if file_name.endswith('.py'):
+                        is_valid, report = self.tester.validate_code(actual_code)
+                        if not is_valid:
+                            logger.warning(f"❌ خطأ بايثون في {file_name}: {report}")
+                            continue 
+                    else:
+                        logger.info(f"📄 ملف استاتيكي {file_name} - تخطي فحص بايثون.")
+
+                    file_path = os.path.join(project_dir, file_name)
+                    self._save_file(file_path, actual_code)
+                    
+                    if file_name == "main.py" and self.project_state["auto_run"]:
+                        logger.info(f"⚙️ فحص تشغيل {file_name}...")
+                        run_success, run_msg = self.executor.execute_code(file_path)
+                        if not run_success:
+                            logger.error(f"⚠️ فشل التشغيل: {run_msg}")
+                    
+                    success = True
+                    logger.info(f"💾 تم اعتماد {file_name} بنجاح.")
+                    
+                except Exception as e:
+                    if "high demand" in str(e).lower():
+                        logger.warning("🕒 الخادم مضغوط.. انتظار 10 ثوانٍ...")
+                        time.sleep(10)
+                    logger.error(f"🚨 خطأ في {file_name}: {e}")
+
+        self.update_cloud_ledger(project_name, "Completed", len(self.project_state["structure"]), self.project_state["duration"])
+        self._generate_readme(project_name, enhanced_desc, project_dir)
+        return True
     def _inject_env_file(self, project_dir):
         """دالة البحث الصارم عن المفتاح وحقنه"""
         try:
@@ -178,71 +294,71 @@ class AgentForgeOrchestrator:
 
         return actual_code
     
-    def _run_coding_phase(self):
-        # 1. إعداد المجلدات والحقن
-        project_name = self.project_state["name"]
-        project_dir = os.path.join(os.getcwd(), "projects", project_name)
-        os.makedirs(project_dir, exist_ok=True)
-        self._inject_env_file(project_dir)
+    # def _run_coding_phase(self):
+    #     # 1. إعداد المجلدات والحقن
+    #     project_name = self.project_state["name"]
+    #     project_dir = os.path.join(os.getcwd(), "projects", project_name)
+    #     os.makedirs(project_dir, exist_ok=True)
+    #     self._inject_env_file(project_dir)
 
-        enhanced_desc = self.project_state.get("enhanced_description", self.project_state["description"])
+    #     enhanced_desc = self.project_state.get("enhanced_description", self.project_state["description"])
         
-        # تعريف الوكلاء
-        tester = TesterAgent()
-        executor = ExecutorAgent()
+    #     # تعريف الوكلاء
+    #     tester = TesterAgent()
+    #     executor = ExecutorAgent()
         
-        for file_name, task in self.project_state["structure"].items():
-            # تجاهل المفاتيح التي ليست ملفات
-            if file_name.lower() in ["project_name", "description"] or "." not in file_name:
-                continue
+    #     for file_name, task in self.project_state["structure"].items():
+    #         # تجاهل المفاتيح التي ليست ملفات
+    #         if file_name.lower() in ["project_name", "description"] or "." not in file_name:
+    #             continue
             
-            success = False
-            attempts = 0
-            while attempts < self.project_state.get("max_attempts", 3) and not success:
-                try:
-                    attempts += 1
-                    logger.info(f"📝 برمجة {file_name} - محاولة {attempts}")
+    #         success = False
+    #         attempts = 0
+    #         while attempts < self.project_state.get("max_attempts", 3) and not success:
+    #             try:
+    #                 attempts += 1
+    #                 logger.info(f"📝 برمجة {file_name} - محاولة {attempts}")
                     
-                    # استلام الرد
-                    raw_response = self.coder.write_code(file_name, enhanced_desc, str(task))
+    #                 # استلام الرد
+    #                 raw_response = self.coder.write_code(file_name, enhanced_desc, str(task))
                     
-                    # تنظيف واستخراج الكود (باستخدام الدالة التي أنشأناها سابقاً)
-                    actual_code = self._clean_code_output(raw_response)
+    #                 # تنظيف واستخراج الكود (باستخدام الدالة التي أنشأناها سابقاً)
+    #                 actual_code = self._clean_code_output(raw_response)
 
-                    # 2. الاختبار البرمجي (Static Analysis)
-                    is_valid, report = tester.validate_code(actual_code)
-                    if not is_valid:
-                        logger.warning(f"❌ خطأ قواعد في {file_name}: {report}")
-                        continue 
+    #                 # 2. الاختبار البرمجي (Static Analysis)
+    #                 is_valid, report = tester.validate_code(actual_code)
+    #                 if not is_valid:
+    #                     logger.warning(f"❌ خطأ قواعد في {file_name}: {report}")
+    #                     continue 
 
-                    # 3. حفظ الملف
-                    file_path = os.path.join(project_dir, file_name)
-                    self._save_file(file_path, actual_code)
+    #                 # 3. حفظ الملف
+    #                 file_path = os.path.join(project_dir, file_name)
+    #                 self._save_file(file_path, actual_code)
                     
-                    # 4. التشغيل والتصحيح الذاتي للمكتبات
-                    if file_name == "main.py":
-                        logger.info(f"⚙️ جاري فحص تشغيل {file_name} وتثبيت المكتبات...")
-                        run_success, run_msg = executor.execute_code(file_path)
-                        if not run_success:
-                            logger.error(f"⚠️ فشل التشغيل التجريبي: {run_msg}")
-                            # هنا يمكننا إضافة محاولة إصلاح إذا أردت مستقبلاً
+    #                 # 4. التشغيل والتصحيح الذاتي للمكتبات
+    #                 if file_name == "main.py":
+    #                     logger.info(f"⚙️ جاري فحص تشغيل {file_name} وتثبيت المكتبات...")
+    #                     run_success, run_msg = executor.execute_code(file_path)
+    #                     if not run_success:
+    #                         logger.error(f"⚠️ فشل التشغيل التجريبي: {run_msg}")
+    #                         # هنا يمكننا إضافة محاولة إصلاح إذا أردت مستقبلاً
                     
-                    success = True
-                    logger.info(f"💾 تم اعتماد {file_name} بنجاح.")
+    #                 success = True
+    #                 logger.info(f"💾 تم اعتماد {file_name} بنجاح.")
                     
-                except Exception as e:
-                    logger.error(f"🚨 خطأ في محاولة برمجة {file_name}: {e}")
-                    # في حال فشل كل شيء، نقوم بتنظيف يدوي أخير كملاذ أخير
-                    if attempts == self.project_state.get("max_attempts", 3):
-                        logger.warning("🔄 محاولة الإنقاذ الأخيرة عبر التنظيف اليدوي...")
-                        lines = raw_response.split('\n')
-                        rescue_code = '\n'.join([l for l in lines if l.strip().lower() != 'json'])
-                        self._save_file(os.path.join(project_dir, file_name), rescue_code)
-        self.update_cloud_ledger(project_name, "Completed", len(self.project_state["structure"]), 45)
-        # توليد ملفات المساعدة
-        self._generate_bat_file(project_dir)
-        self._generate_readme(project_name, enhanced_desc, project_dir)
-        return True
+    #             except Exception as e:
+    #                 logger.error(f"🚨 خطأ في محاولة برمجة {file_name}: {e}")
+    #                 # في حال فشل كل شيء، نقوم بتنظيف يدوي أخير كملاذ أخير
+    #                 if attempts == self.project_state.get("max_attempts", 3):
+    #                     logger.warning("🔄 محاولة الإنقاذ الأخيرة عبر التنظيف اليدوي...")
+    #                     lines = raw_response.split('\n')
+    #                     rescue_code = '\n'.join([l for l in lines if l.strip().lower() != 'json'])
+    #                     self._save_file(os.path.join(project_dir, file_name), rescue_code)
+    #     self.update_cloud_ledger(project_name, "Completed", len(self.project_state["structure"]), 45)
+    #     # توليد ملفات المساعدة
+    #     self._generate_bat_file(project_dir)
+    #     self._generate_readme(project_name, enhanced_desc, project_dir)
+    #     return True
         
     # أضف هذه الدالة داخل كلاس Orchestrator
     def update_cloud_ledger(self, project_name, status, files_count, duration):

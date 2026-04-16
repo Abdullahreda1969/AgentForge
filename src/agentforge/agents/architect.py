@@ -12,57 +12,63 @@ load_dotenv()
 
 class ArchitectAgent:
     def __init__(self):
-        # سحب المفتاح من البيئة الآمنة
         self.api_key = os.getenv("GEMINI_API_KEY")
         self.model_id = "gemma-3-27b-it"
-        # الرابط المباشر للموديل
         self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_id}:generateContent?key={self.api_key}"
         
         self.system_prompt = """
         You are a Senior Software Architect. Your goal is to design a clean, modular directory structure for Python projects.
-        RESPONSE FORMAT: You must return ONLY a valid JSON object. Do not include markdown code blocks like json ...  or any conversational text. Start your response with { and end with }.
+        RESPONSE FORMAT: Return ONLY a valid JSON object. No markdown, no conversational text.
+        Whenever the project requires data persistence, you MUST include a database.py file. This file should define SQLAlchemy models. The project structure should now follow this pattern: database.py (Models/Engine), helpers.py (CRUD Operations), and main.py (UI).
+        STRICT ARCHITECTURAL RULES:
+        1. MODULARITY: You MUST separate business logic from the UI. Every project must have:
+           - 'config.py': To handle environment variables and keys.
+           - 'helpers.py': To contain all functions, calculations, and API calls.
+           - 'main.py': ONLY for the Streamlit UI and calling functions from helpers.py.
         
-        Only output actual source code files in the structure (e.g., .py, .css, .html). Any design notes or descriptions must be included as comments inside the code files, not as separate files.
-        Strict File Naming: You must ONLY use valid filenames with extensions (e.g., app.py, style.css) as keys in the 'structure' object.
+        2. NO MOCK SECRETS: Do NOT create '.streamlit/secrets.toml' with "YOUR_KEY" placeholders. The system handles secrets via .env. If you must include it, keep it empty or note it in comments.
 
-        No Explanatory Keys: Never use keys like 'files', 'directories', or 'notes'. If you have notes, put them inside the code files as comments.
-        Instead of creating separate files for small tasks like directory creation, combine them into a utils.py file or include them in main.py.
-        Files must be named based on their role in the app (e.g., auth.py, database.py, ui_components.py), never generic names like files or directories.
-        Ensure that main.py actually imports and uses the functions defined in other files.
-        Core Files Only: Ensure 'main.py' is always the entry point of the project.
-        STRICT DESIGN RULES:
-        1. WEB FRAMEWORK: Use Streamlit for the UI. It is the best for our cloud environment.
-        2. STATE MANAGEMENT: For interactive apps, instruct the coder to use 'st.session_state' to store data. Avoid local file databases (like .db or .txt) unless explicitly asked.
-        3. MODULARITY: Separate logic from data processing.
-        4. NAMING: Use snake_case for filenames and PascalCase for Classes.
-        5. ENTRY POINT: Ensure there is a clear main.py to launch the application.
-        6. HYBRID ENVIRONMENT AWARENESS:
-        - Always plan for a 'config.py' or 'utils.py' to manage API keys.
-        - Design the logic to support both Local (dotenv) and Cloud (streamlit secrets) environments.
-        - Ensure the structure includes a '.streamlit/secrets.toml' placeholder for local testing.
-        # - Do not include .env in the project structure. The system will inject it automatically. However, you MUST ensure that config.py or the main file expects the API key from environment variables.
-        If a [STRATEGIC TEMPLATE] is provided, prioritize its architectural patterns.
-        CRITICAL: Ensure your JSON is perfectly formatted. Double check for missing commas or unclosed braces.
+        3. FILE NAMING: Use unique, descriptive names (e.g., 'weather_logic.py' instead of 'logic.py'). NEVER use generic names like 'utils' or 'test'.
+
+        4. DEPENDENCY ORDER: In the JSON description for each file, explicitly state which file it depends on. 
+           Example: "main.py": "UI code. REQUIRES functions from helpers.py".
+
+        5. STREAMLIT BEST PRACTICES:
+           - Use 'st.session_state' for data persistence.
+           - Plan for a 'style.css' if professional look is needed.
+
+        6. EXECUTION SEQUENCE (Crucial): 
+           Structure the project so that logic is defined before the UI. 
+           Order: Configuration -> Logic Helpers -> Main UI.
+
+        REQUIRED OUTPUT STRUCTURE:
+        {
+          "config.py": "description",
+          "helpers.py": "description",
+          "main.py": "description",
+          "style.css": "description",
+          "start_app.bat": "command"
+        }
         """
 
     def design_project(self, name, description):
         logger.info(f"🧠 المصمم الاحترافي يخطط لمشروع: {name}...")
         
-        user_context = f"Project: {name}\nGoal: {description}\nContext: Create a functional Python GUI application."
+        # دمج القواعد المحلية إذا وجدت لضمان الالتزام
+        user_context = f"Project Name: {name}\nGoal: {description}\nTask: Design the structure."
         full_prompt = f"{self.system_prompt}\n\n{user_context}"
         
         payload = {
             "contents": [{"parts": [{"text": full_prompt}]}],
             "generationConfig": {
-                "temperature": 0.2, # درجة حرارة منخفضة لضمان الحصول على JSON سليم
-                "maxOutputTokens": 1024
+                "temperature": 0.1, # خفضنا الحرارة أكثر لزيادة الدقة في الـ JSON
+                "maxOutputTokens": 2048
             }
         }
         
         headers = {'Content-Type': 'application/json'}
 
         try:
-            # استدعاء الموديل عبر requests بدلاً من مكتبة genai القديمة
             response = requests.post(self.api_url, headers=headers, data=json.dumps(payload))
             res_json = response.json()
             
@@ -70,32 +76,42 @@ class ArchitectAgent:
                 raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
                 structure = self._parse_json_response(raw_text)
                 
-                # ضمان وجود الملفات الأساسية
+                # تصحيح تلقائي للهيكل لضمان عدم الانهيار
                 if "main.py" not in structure:
-                    structure["main.py"] = "Create the main GUI entry point using Streamlit."
-                if "start_app.bat" not in structure:
-                    structure["start_app.bat"] = "streamlit run main.py"
-                    
+                    structure["main.py"] = "Main Streamlit entry point."
+                
+                # إزالة أي ملفات قد تسبب تعارضات برمجية غير مقصودة
+                forbidden_files = ["utils.py", "test.py", "requests.py"]
+                for f in forbidden_files:
+                    if f in structure:
+                        new_name = f"project_{f}"
+                        structure[new_name] = structure.pop(f)
+
                 return structure
             else:
-                raise Exception(res_json.get("error", {}).get("message", "فشل في الحصول على رد"))
+                error_msg = res_json.get("error", {}).get("message", "API Spike or Connection Issue")
+                raise Exception(error_msg)
 
         except Exception as e:
             logger.error(f"❌ خطأ في تواصل المصمم: {e}")
-            return {"main.py": "import streamlit as st\nst.title('Failed to generate project structure')"}
+            # رد احتياطي (Fallback) في حالة فشل الـ API تماماً
+            return {
+                "config.py": "Load environment variables.",
+                "helpers.py": "Main logic and functions.",
+                "main.py": "Streamlit UI calling helpers.py.",
+                "start_app.bat": "streamlit run main.py"
+            }
 
     def _parse_json_response(self, text):
-        """دالة قوية لاستخراج الـ JSON وتطهيره من أي نص زائد"""
+        """تطهير الرد واستخراج JSON سليم"""
         try:
-            # تنظيف علامات الماركدوان إن وجدت
-            clean_text = text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_text)
-        except:
-            try:
-                import re
-                match = re.search(r'(\{.*\})', text, re.DOTALL)
-                if match:
-                    return json.loads(match.group(1))
-            except Exception as e:
-                logger.error(f"❌ فشل تحويل الرد إلى JSON: {e}")
-                return {"main.py": "Coding task failed"}
+            # محاولة البحث عن أول { وآخر } لقص أي نصوص زائدة
+            start_idx = text.find('{')
+            end_idx = text.rfind('}') + 1
+            if start_idx != -1 and end_idx != -1:
+                clean_text = text[start_idx:end_idx]
+                return json.loads(clean_text)
+            return json.loads(text)
+        except Exception as e:
+            logger.error(f"❌ فشل تطهير JSON: {e}")
+            return {"main.py": "Error in architecture generation."}

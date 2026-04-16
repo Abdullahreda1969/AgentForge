@@ -1,43 +1,58 @@
 import subprocess
 import sys
 import logging
-import time # سنحتاجه للتحقق السريع
+import time
+import os
+import re
 
 logger = logging.getLogger("AgentForge.Executor")
 
 class ExecutorAgent:
+    def __init__(self):
+        # قائمة بالمكتبات التي فشل تثبيتها لمنع تكرار المحاولة
+        self.failed_installs = set()
+
     def execute_code(self, file_path):
-        """يشغل الكود مع ضمان ظهور النوافذ وتجنب اختناق الأنابيب"""
+        """يشغل الكود مع فلتر ذكي للمكتبات المحلية"""
         try:
-            # تشغيل العملية بدون PIPE للمخرجات لضمان عدم التجمد
-            # نترك stderr فقط للقبض على أخطاء التشغيل الفورية
+            # 1. تشغيل العملية
             process = subprocess.Popen(
                 [sys.executable, file_path],
-                stdout=None, # السماح بالظهور المباشر
+                stdout=None, 
                 stderr=subprocess.PIPE, 
                 text=True
             )
 
-            # انتظر 3 ثوانٍ فقط للتحقق من الاستقرار
+            # انتظر قليلاً للتحقق من استقرار التشغيل
             time.sleep(3)
-            
             poll = process.poll()
             
             if poll is None:
-                # العملية تعمل، نتركها تعمل في الخلفية ونعتبرها نجاحاً
-                logger.info(f"🚀 تم إطلاق الواجهة الرسومية بنجاح لـ {file_path}")
-                return True, "GUI Started Successfully"
+                logger.info(f"🚀 تم إطلاق العملية بنجاح لـ {file_path}")
+                return True, "Success"
 
-            # إذا انتهت العملية فوراً، نقرأ الخطأ من stderr
+            # 2. إذا انتهت العملية فوراً، نحلل الخطأ
             _, stderr = process.communicate()
-
-            # معالجة نقص المكتبات
-            if process.returncode != 0 and "ModuleNotFoundError" in (stderr or ""):
+            
+            if "ModuleNotFoundError" in (stderr or ""):
                 missing_module = self._extract_module_name(stderr)
+                
                 if missing_module:
-                    logger.info(f"🛠️ اكتشاف مكتبة مفقودة: {missing_module}. جاري التثبيت...")
-                    if self._install_module(missing_module):
-                        return self.execute_code(file_path)
+                    # --- القاعدة الذهبية الجديدة: هل المكتبة محلية؟ ---
+                    project_dir = os.path.dirname(file_path)
+                    local_file = os.path.join(project_dir, f"{missing_module}.py")
+                    
+                    if os.path.exists(local_file):
+                        logger.warning(f"⚠️ {missing_module} هو ملف محلي وليس مكتبة خارجية. انتظر اكتمال المبرمج.")
+                        return False, f"Local module {missing_module} is missing or not yet written."
+
+                    # --- إذا كانت مكتبة خارجية فعلاً ---
+                    if missing_module not in self.failed_installs:
+                        logger.info(f"🛠️ اكتشاف مكتبة مفقودة: {missing_module}. جاري التثبيت...")
+                        if self._install_module(missing_module):
+                            return self.execute_code(file_path) # إعادة المحاولة
+                        else:
+                            self.failed_installs.add(missing_module)
 
             if process.returncode == 0:
                 return True, "Process finished successfully"
@@ -48,20 +63,21 @@ class ExecutorAgent:
             return False, str(e)
         
     def _extract_module_name(self, error_msg):
-        """يستخرج اسم المكتبة من رسالة الخطأ"""
-        # مثال: No module named 'yfinance'
         try:
-            import re
             match = re.search(r"No module named '([^']+)'", error_msg)
             return match.group(1) if match else None
         except:
             return None
 
     def _install_module(self, module_name):
-        """تنفيذ أمر التثبيت مع إظهار المخرجات"""
+        """تنفيذ أمر التثبيت مع الحماية من الأسماء الخاطئة"""
+        # حماية من تثبيت ملفات المشروع كأنها مكتبات (مثل calc_logic)
+        forbidden_to_install = ["config", "helpers", "logic", "utils", "main", "app"]
+        if any(f in module_name.lower() for f in forbidden_to_install):
+            return False
+
         try:
-            print(f"📦 Installing {module_name}...")
-            # استخدام check_call يضمن أننا ننتظر انتهاء التثبيت
+            print(f"📦 Pip Installing {module_name}...")
             subprocess.check_call([sys.executable, "-m", "pip", "install", module_name])
             return True
         except Exception as e:

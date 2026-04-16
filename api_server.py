@@ -4,17 +4,16 @@ import uuid
 import sqlite3
 import json
 import time
+import gspread
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 import shutil
 from fastapi.responses import FileResponse
-
-# 1. إضافة المسار أولاً (مهم جداً)
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
-
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Security, Header
 from fastapi.security.api_key import APIKeyHeader
 from agentforge.core.orchestrator import AgentForgeOrchestrator
-
+# 1. إضافة المسار أولاً (مهم جداً)
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 # 2. إعداد الحماية
 API_KEY_NAME = "access_token"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
@@ -110,38 +109,72 @@ async def check_status(job_id: str):
         "result": task[2],
         "created_at": task[3]
     }
+@app.get("/")
+async def root():
+    return {"message": "AgentForge API is online!", "docs": "/docs"}
+    
+def log_to_sheets(project_name, status, file_count, duration):
+    try:
+        # تحديد المسار المطلق للملف لضمان العثور عليه في البيئة المحلية
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        creds_path = os.path.join(current_dir, "credentials.json")
 
+        if not os.path.exists(creds_path):
+            print(f"❌ خطأ: ملف المفاتيح غير موجود في {creds_path}")
+            return False
+
+        scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        
+        # تحميل البيانات ومعالجة المفتاح السري
+        with open(creds_path, "r") as f:
+            creds_info = json.load(f)
+            # الحل السحري لمشكلة الـ Private Key في ويندوز
+            creds_info['private_key'] = creds_info['private_key'].replace('\\n', '\n')
+
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+        client = gspread.authorize(creds)
+        
+        # رابط الجدول الخاص بك (تأكد أنه متاح للحساب البرمجي - Service Account)
+        sheet_url = "https://docs.google.com/spreadsheets/d/1gWF-LQ4MQqgUJx2GVbno_2BplQBGQBuU8goQBTT1Bl4/edit"
+        sheet = client.open_by_url(sheet_url).sheet1
+        
+        row = [
+            project_name, 
+            status, 
+            file_count, 
+            f"{duration}s", 
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ]
+        sheet.append_row(row)
+        print(f"🚀 تم بنجاح إرسال البيانات لجداول جوجل: {project_name}")
+        return True
+    except Exception as e:
+        print(f"⚠️ فشل الاتصال بغوغل: {e}")
+        return False
 def run_engine(job_id: str, project_name: str, task_description: str):
     start_time = time.time()
     update_task_status(job_id, "In Progress 🏗️", "Engine is working...")
     
     try:
-        # 1. تشغيل المحرك (الذي أصبح الآن يحفظ في مجلد projects/)
         af = AgentForgeOrchestrator()
         af.start_cycle(project_name=project_name, description=task_description)
         
-        # 2. حساب الوقت المستغرق
         duration = round(time.time() - start_time, 2)
-        
-        # 3. الوصول للمجلد الصحيح بدقة
-        # نستخدم abspath لضمان عدم حدوث ارتباك في المسارات
         project_path = os.path.abspath(os.path.join(os.getcwd(), "projects", project_name))
         
         actual_file_count = 0
         if os.path.exists(project_path):
-            # عد الملفات الحقيقية فقط
             files = [f for f in os.listdir(project_path) if os.path.isfile(os.path.join(project_path, f))]
             actual_file_count = len(files)
-            print(f"🎯 نجاح! وجدنا {actual_file_count} ملفات في {project_path}")
-        else:
-            print(f"⚠️ تحذير: المجلد {project_path} غير موجود!")
 
-        # 4. تحديث قاعدة البيانات بالبيانات النهائية والكاملة
+        # --- الاستدعاء الآن سيعمل بنجاح ---
+        log_to_sheets(project_name, "Completed ✅", actual_file_count, duration)
+        
         update_task_status(job_id, "Completed ✅", f"Project {project_name} built successfully.")
         update_task_stats(job_id, actual_file_count, duration)
         
     except Exception as e:
-        print(f"❌ خطأ كارثي في المحرك: {str(e)}")
+        log_to_sheets(project_name, "Failed ❌", 0, 0) # سجل الفشل أيضاً
         update_task_status(job_id, "Failed ❌", str(e))
 
 @app.get("/download/{project_name}")

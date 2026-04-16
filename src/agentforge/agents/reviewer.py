@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import logging
+import re
 from dotenv import load_dotenv
 
 logger = logging.getLogger("AgentForge.Reviewer")
@@ -14,46 +15,34 @@ class Reviewer:
         self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_id}:generateContent?key={self.api_key}"
 
     def review_code(self, code, task, history=None): 
-        """Reviews the code based on task requirements and strict quality standards."""
+        """مراجعة الكود بناءً على معايير الجودة الصارمة والدستور المحلي."""
         
-        # استخدمنا نصاً عادياً للقواعد لضمان عدم تداخل الأقواس مع f-string
         rejection_criteria = """
-        RESPONSE FORMAT: You must return ONLY a valid JSON object. Do not include markdown code blocks like json ...  or any conversational text. Start your response with { and end with }.
-        🛑 REJECTION CRITERIA (FAIL if any of these are met):
-        1. BUTTON LOGIC: FAIL if any button is not connected to a meaningful function.
-        2. DATA INTEGRITY: FAIL if JSON/Data loading is not robust.
-        3. PLACEHOLDERS: FAIL if there are empty 'pass' statements or 'TODO' comments.
-        4. GUI STANDARDS: FAIL if results are only printed to console.
-        5. IMPORTS: FAIL if any library is used but not imported.
-        6. SECURITY: FAIL if there are hardcoded local paths like 'C:\\Users\\...'.
-        7. README: FAIL if there is no English README.md with setup instructions.
-        8. LANGUAGE: FAIL if comments or documentation are not in English.
-        9. JSON VALIDITY: FAIL if any .json file created is invalid.
-        10. ANIMATION/UPDATE: FAIL if a time-based app is 'static'.
-        11. CLEAN REQUIREMENTS: FAIL if requirements.txt contains standard libraries like 'os'.
-        12. SCOPE: FAIL if the UI is non-responsive or root.mainloop() is missing.
-        13. CALLBACK ERRORS: FAIL if 'lambda' is used in Streamlit widget parameters (on_change/on_click).
-        14. PLACEHOLDERS: FAIL if the code contains 'YOUR_API_KEY', 'your-endpoint', or any placeholder strings.
-        15. CLOUD READINESS: FAIL if the code doesn't check 'st.secrets' for API keys.
-        16. UX: FAIL if an AI-dependent app doesn't use a spinner or loading indicator during API calls.
-        17. MODEL COMPLIANCE: FAIL if the code uses any model other than 'gemma-3-27b-it'. Specifically, search for and reject 'gemini-pro' or 'gemini-1.5-flash'.
-        18. SECRET CRASH PROTECTION: FAIL if st.secrets is accessed without a try-except block. This is a common cause of crashes in local environments.
-        ### CRITICAL CHECK: ENVIRONMENT INITIALIZATION ###
-        - Check the first 5 lines of the code. 
-        - If the code does not contain 'load_dotenv()' and 'import os', you MUST return "FAIL" with the reason: "Missing Environment Initialization Block".
-        - Verify that the model name used is strictly 'gemma-3-27b-it'.        """
+        🛑 CRITICAL REJECTION CRITERIA:
+        1. MODULARITY: FAIL if business logic is inside main.py instead of helpers.py.
+        2. ENVIRONMENT: FAIL if 'load_dotenv()' or 'import os' is missing in .py files.
+        3. STREAMLIT TYPES: FAIL if st.number_input initial value is not a float (e.g., must be 0.0).
+        4. IMPORTS: FAIL if the code calls a function from 'helpers.py' without importing it.
+        5. PLACEHOLDERS: FAIL if any 'YOUR_API_KEY' or 'pass' statements exist.
+        6. MODEL: FAIL if any model ID other than 'gemma-3-27b-it' is mentioned.
+        7. SECRETS: FAIL if st.secrets is used without a try-except block.
+        8. UI/UX: FAIL if no loading spinner (st.spinner) is used for long operations.
+        9. STATIC CONTENT: FAIL if the file is a .bat or .css but contains Python syntax.
+        10. CROSS-FILE INTEGRATION: > You are provided with the code of previously approved files in the 'PREVIOUS FAILURES/CONTEXT' section. You MUST verify that the current code calls functions from those files correctly. If helpers.py is provided and it defines calculate(a, b), reject the current code if it calls calculate(data_list). Consistency is your top priority.
+        11. MINOR ERRORS: If the error is minor and the programmer can fix it on the next attempt, be very specific in stating the error.
+        """
 
         full_prompt = (
-            f"You are a Lead QA Engineer. Strictly review this code:\n"
-            f"TARGET TASK: {task}\n"
-            f"PREVIOUS FAILURES: {history if history else 'None'}\n"
+            f"You are a Senior Lead QA Engineer. Review this code strictly:\n"
+            f"TASK: {task}\n"
+            f"PREVIOUS ERRORS: {history if history else 'None'}\n"
             f"---\n"
             f"CODE TO REVIEW:\n{code}\n"
             f"---\n"
             f"{rejection_criteria}\n"
-            f"\n⚠️ RESPONSE FORMAT:\n"
-            f"- Start with 'PASS' ONLY if the code is 100% production-ready.\n"
-            f"- Start with 'FAIL' followed by a detailed technical report in English."
+            f"\nRESPONSE PROTOCOL:\n"
+            f"- If perfect: Start with 'PASS'.\n"
+            f"- If flawed: Start with 'FAIL' followed by a bulleted technical report."
         )
         
         payload = {
@@ -66,14 +55,21 @@ class Reviewer:
 
         try:
             headers = {'Content-Type': 'application/json'}
-            response = requests.post(self.api_url, headers=headers, data=json.dumps(payload))
+            response = requests.post(self.api_url, headers=headers, data=json.dumps(payload), timeout=30)
             res_json = response.json()
             
             if "candidates" in res_json:
-                return res_json['candidates'][0]['content']['parts'][0]['text']
+                raw_review = res_json['candidates'][0]['content']['parts'][0]['text']
+                return self._clean_review_text(raw_review)
             else:
-                error_msg = res_json.get("error", {}).get("message", "API Error")
-                return f"FAIL: Communication error with Gemma model ({error_msg})."
+                return "FAIL: API error during review."
         except Exception as e:
-            logger.error(f"❌ Error in Reviewer Communication: {e}")
-            return f"FAIL: Connection failure during review process: {str(e)}"
+            logger.error(f"❌ Reviewer Error: {e}")
+            return f"FAIL: Connection failure during review: {str(e)}"
+
+    def _clean_review_text(self, text):
+        """تطهير نص المراجعة لضمان بدءه بـ PASS أو FAIL مباشرة"""
+        text = text.strip()
+        # إزالة أي علامات ماركداون قد تسبق الكلمة المفتاحية
+        text = re.sub(r'^[`\s]*', '', text)
+        return text

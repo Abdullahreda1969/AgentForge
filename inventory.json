@@ -1,7 +1,10 @@
 {
-    "products": {
-        "name": "2",
-        "quantity": 2,
-        "price": 2.0
-    }
+    "products": [
+        {
+            "id": "item_001",
+            "name": "Project Template A",
+            "quantity": 10,
+            "price": 0.0
+        }
+    ]
 }
