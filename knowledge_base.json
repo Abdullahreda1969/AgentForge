@@ -1,0 +1,50 @@
+{
+  "Reviewer_Core_Mandate": [
+    "ANTI-PEDANTRY RULE: If the code is functional, safe, and follows memory rules, PASS it. Do not reject a file for missing features that belong in other files (e.g., do not fail config.py for missing database models).",
+    "ATOMIC REVIEW: Judge each file ONLY by its local content and its specific responsibility."
+  ],
+  "Technical_Standards": {
+    "Streamlit_Rules": [
+      "MANDATORY: 'import streamlit as st' must be the absolute first line in any GUI-related file.",
+      "TYPES: Initialize all numeric inputs (st.number_input) with floats (0.0) instead of integers.",
+      "CALLBACKS: When using 'on_click' with arguments, you MUST use a lambda function: on_click=lambda: func(arg).",
+      "SECRETS: Access st.secrets using: try: val = st.secrets['KEY'] except (KeyError, AttributeError): val = os.getenv('KEY').",
+      "Do NOT re-fetch environment variables in database.py. ALWAYS import them from config.py (e.g., from config import DATABASE_URL).",
+      "The database.py file must ONLY contain: SQLAlchemy Base, Engine, SessionLocal, and Table Models. No business logic functions.",
+      "Task Priorities: Ensure database columns match the data types in config.py (e.g., if TASK_PRIORITIES are strings, use Column(String) for priority).",
+      "MANDATORY: Every main.py must start with 'import streamlit as st' followed by 'from config import *' and 'import helpers'.",
+      "STRICT: Use 'st.header' NOT 'tst.header'. Double-check all Streamlit prefixes.",
+      "INTEGRATION: If TASK_PRIORITIES is a list, use it directly in st.selectbox(..., options=TASK_PRIORITIES).",
+      "CALLBACKS: Use st.form for adding data and only use st.rerun() if absolutely necessary. Prefer state updates."
+    ],
+    "Database_SQLAlchemy": [
+      "SAFE_SESSIONS: Use context managers (with SessionLocal() as db:) for all database operations.",
+      "MODELS: Every SQLAlchemy model MUST have a Primary Key defined (id = Column(Integer, primary_key=True)).",
+      "SEPARATION: No database engine creation inside config.py. All DB logic stays in database.py or helpers.py."
+    ],
+    "Integration_Consistency": [
+      "FUNCTION_SYNC: You MUST match function signatures across files. If helpers.py defines 'view_tasks()', do not call it as 'get_all_tasks()' in main.py.",
+      "BOOLEAN_LOGIC: Compare env variables using: os.getenv('VAR', 'false').lower() == 'true'."
+    ]
+  },
+  "Project_Structure_Responsibility": {
+    "config.py": "Environment variables, constants, and basic logging setup ONLY.",
+    "database.py": "SQLAlchemy Engine, Base, Models, and SessionLocal definition.",
+    "helpers.py": "All business logic, database queries, and data processing. No UI code.",
+    "main.py": "Streamlit UI layout and user interaction ONLY. Calls helpers.py for logic."
+  },
+  "Critical_Rejection_Criteria": [
+    "Hardcoded secrets or placeholders like 'YOUR_API_KEY' or 'pass'.",
+    "Unsafe database session management (missing close/context manager).",
+    "Direct manipulation of st.session_state for core business logic.",
+    "Python syntax inside static files like .css or .bat."
+  ],
+  "Mandatory_Templates": {
+    "database.py": "import streamlit as st\nfrom sqlalchemy import create_engine, Column, Integer, String\nfrom sqlalchemy.ext.declarative import declarative_base\nfrom sqlalchemy.orm import sessionmaker\nfrom config import DATABASE_URL\n\nBase = declarative_base()\nengine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False})\nSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)\n\nclass Task(Base):\n    __tablename__ = 'tasks'\n    id = Column(Integer, primary_key=True, index=True)\n    title = Column(String, nullable=False)\n    priority = Column(String)\n    status = Column(String, default='Pending')\n\nBase.metadata.create_all(bind=engine)",
+
+    "helpers.py": "import os\nfrom dotenv import load_dotenv\nfrom database import SessionLocal, Task\n\nload_dotenv()\n\ndef add_task(title, priority, status='Pending'):\n    with SessionLocal() as db:\n        new_task = Task(title=title, priority=priority, status=status)\n        db.add(new_task)\n        db.commit()\n\ndef view_tasks():\n    with SessionLocal() as db:\n        return db.query(Task).all()\n\ndef delete_task(task_id):\n    with SessionLocal() as db:\n        task = db.query(Task).filter(Task.id == task_id).first()\n        if task:\n            db.delete(task)\n            db.commit()",
+
+    "main.py": "import streamlit as st\nfrom config import TASK_PRIORITIES\nimport helpers\n\nst.set_page_config(page_title='Inventory')\nst.title('📦 Inventory Manager')\n\n# إضافة عنصر جديد\nwith st.form('add_form', clear_on_submit=True):\n    name = st.text_input('Item Name')\n    prio = st.selectbox('Priority', options=TASK_PRIORITIES)\n    if st.form_submit_button('Save'):\n        if name:\n            helpers.add_task(name, prio)\n            st.toast(f'Saved: {name}')\n            st.rerun()\n\nst.divider()\n\n# عرض وحذف العناصر - الطريقة التي يفضلها المراجع\nitems = helpers.view_tasks()\nfor item in items:\n    cols = st.columns([4, 2, 1])\n    cols[0].write(item.title)\n    cols[1].info(item.priority)\n    # هنا السر: استخدام callback بسيط بدون rerun يدوي\n    cols[2].button('🗑️', key=f'btn_{item.id}', on_click=helpers.delete_task, args=(item.id,))"
+  }
+  
+}

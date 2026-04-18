@@ -13,7 +13,7 @@ load_dotenv()
 class ArchitectAgent:
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
-        self.model_id = "gemma-3-27b-it"
+        self.model_id = "gemma-3-1b-it"
         self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_id}:generateContent?key={self.api_key}"
         
         self.system_prompt = """

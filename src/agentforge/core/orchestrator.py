@@ -11,6 +11,7 @@ from src.agentforge.agents.coder import CoderAgent
 from src.agentforge.agents.executor import ExecutorAgent
 from src.agentforge.agents.reviewer import Reviewer
 from src.agentforge.agents.tester import TesterAgent
+from src.agentforge.agents.memory import MemoryAgent
 # إعدادات الطباعة والسجل
 sys.stdout.reconfigure(encoding='utf-8')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,9 +19,10 @@ logger = logging.getLogger("AgentForge")
 
 class AgentForgeOrchestrator:
     def __init__(self):
-        # تهيئة الوكلاء
+        # تهيئة الوكلاء        
+        self.memory = MemoryAgent() # تفعيل الذاكرة
         self.architect = ArchitectAgent()
-        self.coder = CoderAgent()
+        self.coder = CoderAgent(memory=self.memory)# تمرير الذاكرة هنا
         self.tester = TesterAgent()
         self.executor = ExecutorAgent()
         self.reviewer = Reviewer()
@@ -64,36 +66,51 @@ class AgentForgeOrchestrator:
     def start_cycle(self, project_name, description, template="auto"):
         logger.info(f"🚀 بدء المحاكاة: {project_name} | القالب: {template}")
         
-        # 1. المرحلة الأولى: التصميم
-        structure = self.architect.design_project(project_name, description)
+        # 1. جلب القواعد والذاكرة لتعزيز المناعة
+        gui_rules = self._load_gui_rules() # جلب الدستور البرمجي
+        memory_context = self.memory.get_context_for_coder()
+        
+        # دمج السياق الكامل (الوصف + الذاكرة + الدستور)
+        full_instruction = f"{description}\n\n{memory_context}\n\n{gui_rules}"
+
+        # 2. المرحلة الأولى: التصميم (المصمم يقرأ الدستور الآن)
+        # حقن القواعد للمصمم لضمان تسميات مثل helpers.py بدلاً من utils.py
+        structure = self.architect.design_project(project_name, full_instruction)
+        
         project_path = os.path.join("projects", project_name)
         os.makedirs(project_path, exist_ok=True)
 
         # حقن مفتاح الـ API في المشروع الجديد
         self._inject_env_file(project_path)
 
-        # --- التعديل الجديد: مخزن الأكواد المعتمدة لضمان التكامل ---
+        # مخزن الأكواد المعتمدة لضمان التكامل
         approved_codes = {} 
 
-        # 2. المرحلة الثانية: البرمجة والمراجعة بالتسلسل
+        # 3. المرحلة الثانية: البرمجة والمراجعة بالتسلسل
         for file_name, task_details in structure.items():
             success = False
             attempts = 0
+            file_path = os.path.join(project_path, file_name) # تحديد مسار الملف
             max_attempts = 3
             history = []
 
             logger.info(f"📝 برمجة {file_name}...")
 
             while not success and attempts < max_attempts:
-        
                 attempts += 1
-                
-                # المبرمج يكتب الكود
+                # --- الإجراء التطهيري: مسح النسخة الفاشلة السابقة إن وجدت ---
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        logger.info(f"🗑️ Cleaned up failed version of {file_name} before attempt {attempts}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not delete {file_name}: {e}")
+                # المبرمج يكتب الكود (يستخدم full_instruction التي تشمل الدستور)
                 current_code = self.coder.write_code(
                     file_name=file_name,
-                    project_desc=description,
+                    project_desc=full_instruction, 
                     task_details=task_details,
-                    history=history
+                    history=[]# نرسل قائمة فارغة إذا أردنا بداية نظيفة تماماً
                 )
 
                 # التحقق الأولي (Syntax Test)
@@ -103,24 +120,23 @@ class AgentForgeOrchestrator:
                     history.append(f"Syntax Error: {msg}")
                     continue
 
-                # --- التعديل الجوهري هنا: إرسال الأكواد السابقة كمرجع للمراجع ---
-                # نجمع كل الأكواد التي تم قبولها سابقاً في نص واحد
-                integration_context = "--- PREVIOUSLY APPROVED FILES (Use for consistency) ---\n"
+                # جمع الأكواد السابقة لضمان التكامل
+                integration_context = "--- PREVIOUSLY APPROVED FILES ---\n"
                 for name, code in approved_codes.items():
                     integration_context += f"\nFile [{name}]:\n{code}\n"
+                
+                # إضافة الدستور البرمجي لسياق المراجعة لكي لا يرفض المراجع الكود ظلماً
+                full_review_context = f"{integration_context}\n\n{gui_rules}"
 
-                # المراجع يقوم بفحص الكود الحالي بناءً على ما سبقه
+                # المراجع يقوم بفحص الكود (يقرأ الدستور + الملفات السابقة)
                 review_result = self.reviewer.review_code(
                     code=current_code,
                     task=task_details,
-                    history=integration_context if approved_codes else None
+                    history=full_review_context
                 )
 
                 if "PASS" in review_result:
-                    # حفظ الكود في قائمة المعتمدات ليراه الوكلاء في الملفات القادمة
                     approved_codes[file_name] = current_code
-                    
-                    # حفظ الملف فعلياً على القرص
                     file_path = os.path.join(project_path, file_name)
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(current_code)
@@ -130,10 +146,12 @@ class AgentForgeOrchestrator:
                 else:
                     logger.warning(f"❌ المراجع رفض {file_name} (محاولة {attempts}):\n{review_result}")
                     history.append(f"Reviewer Feedback: {review_result}")
+
             if not success:
-                logger.error(f"🚫 فشل النظام في إنتاج ملف {file_name} سليم بعد {max_attempts} محاولات. توقف العمل.")
+                logger.error(f"🚫 فشل النظام في إنتاج ملف {file_name} سليم بعد {max_attempts} محاولات.")
                 return {"status": "failed", "reason": f"File {file_name} rejected by reviewer."}
-        # 3. المرحلة الثالثة: التنفيذ النهائي (اختياري)
+
+        # 4. المرحلة الثالثة: التنفيذ النهائي
         if "main.py" in approved_codes:
             logger.info("⚙️ فحص تشغيل التطبيق النهائي...")
             main_path = os.path.join(project_path, "main.py")

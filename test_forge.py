@@ -10,19 +10,15 @@ def run_test():
     forge = AgentForgeOrchestrator()
 
     # 2. تعريف مشروع جديد لاختبار "قوة المناعة"
-    project_name = "Inventory_Pro_Test"
+    project_name = "Inventory_Final_Test"
     goal = """
-    Create a professional Inventory manager.
-    - Requirements: main.py for UI, helpers.py for calculations.
-    - Logic: Calculate total value (price * quantity).
-    - UI: Use Streamlit with st.number_input(value=0.0).
-    Fix the previous TypeError in Inventory_Pro_Test.
-ERROR LOG: calculate_total_value() missing 1 required positional argument: 'quantity'.
-ENSURE: 
-1. helpers.py has calculate_total_value(inventory_list).
-2. main.py calls it as helpers.calculate_total_value(st.session_state.inventory).
-3. All math operations handle float values (0.0).
-    """
+            Create a Smart Task Manager with the following:
+            1. Persistence: Use SQLAlchemy to save tasks (id, title, status, priority).
+            2. Database: A dedicated 'database.py' for models and engine.
+            3. Logic: All DB operations (CRUD) must be in 'helpers.py'.
+            4. GUI: A Streamlit interface in 'main.py' to add, view, and delete tasks.
+            5. Standards: No placeholders, use context managers for sessions, and include a professional CSS.
+            """
 
     print(f"🚀 Starting AgentForge v0.5 Simulation...")
     

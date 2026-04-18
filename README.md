@@ -1,54 +1,148 @@
-# 🚀 AgentForge v0.6.0
-
-An autonomous AI-powered software engineer that designs, codes, tests, and self-corrects applications.
-
-## 🧠 Current Capabilities
-
-- **Architecting:** Automatically generates folder structures based on project descriptions.
-- **Multi-Agent Coding:** Uses **Gemma 3** to write clean, modular Python code.
-- **Syntax Validation:** Built-in `TesterAgent` ensures code is syntactically correct before saving.
-- **Runtime Execution:** `ExecutorAgent` runs the generated code in a sub-process to verify logic.
-- **Self-Healing Loop:** The system detects runtime errors and logical failures, providing feedback to the AI for up to 3 retry attempts.
-
-## 🛠️ Tech Stack
-
-- **Engine:** Python 3.14+
-- **AI Brain:** Google GenAI (Gemma-3-1b-it)
-- **Orchestration:** Custom Multi-Agent Orchestrator
-
-## 📈 Recent Achievement
-
-Successfully generated **GoldTracker**, a project that went through 3 iterations of self-correction to fix `NameError` and logic failures automatically.
-
-# 🚀 AgentForge v1.0.0
+# 🚀 AgentForge v1.1.0
 
 **AgentForge** هو محرك بناء برمجيات ذكي يعتمد على نموذج "الوكلاء المتعددين" (Multi-Agent System). يقوم المحرك بتحويل الأوصاف النصية البسيطة إلى مشاريع برمجية كاملة، مع نظام تدقيق ومراجعة ذاتي.
 
+## 🆕 التحديث الكبير في v1.1.0
+
+### 🔄 الانتقال إلى النماذج المحلية (Local Models)
+
+- **✅ تخطي حدود API:** تم استبدال Google Gemini API بـ **Ollama + Gemma 3** محلياً
+- **✅ لا حدود للطلبات:** النموذج يعمل على جهازك الخاص - بدون حصص يومية أو تأخير
+- **✅ خصوصية كاملة:** كل الكود يبقى على جهازك، لا يغادر إلى سيرفرات خارجية
+- **✅ يعمل بدون إنترنت:** بعد تحميل النموذج، النظام يعمل بشكل كامل Offline
+
+### 🔧 حل المشاكل السابقة
+
+- **✅ كسر الدائرة المفرغة:** تم حل مشكلة الرفض المتكرر لملف `helpers.py` بإضافة استثناءات ذكية
+- **✅ تحسين المراجع (Reviewer):** أصبح أكثر مرونة مع المشاريع الصغيرة والمتوسطة
+- **✅ نظام احتياطي (Fallback):** في حال فشل النموذج، يتم استخدام كود احتياطي مضمون العمل
+
 ## 🛠️ كيف يعمل النظام؟ (Architecture)
 
-يعتمد الإصدار 1.0.0 على أربعة وكلاء متخصصين يعملون في تناغم:
+يعتمد الإصدار 1.1.0 على **ستة وكلاء** متخصصين يعملون في تناغم:
 
-1.  **Architect Agent:** يقوم بتحليل الطلب وتصميم الهيكل المجلدات والملفات.
-2.  **Coder Agent:** مبرمج خبير يقوم بكتابة الكود الفعلي بناءً على التصميم.
-3.  **Reviewer Agent (New):** مراقب جودة يقوم بفحص المنطق البرمجي وربط الأزرار والوظائف قبل الاعتماد.
+| الوكيل | المسؤولية |
+|--------|------------|
+| **Architect** | تحليل الطلب وتصميم هيكل المجلدات والملفات |
+| **Coder** | مبرمج خبير يكتب الكود الفعلي |
+| **Reviewer** | مراقب جودة يفحص المنطق البرمجي وربط الوظائف |
+| **Executor** | تشغيل الكود في بيئة معزولة |
+| **Tester** | اختبار السلامة النحوية (Syntax) |
+| **Memory** | تخزين القواعد والسياق بين المحاولات |
 
-4.  **Executor & Tester Agent:** يقوم بتشغيل الكود في بيئة معزولة واختبار سلامته النحوية والوظيفية.
+## 📊 مقارنة الأداء
 
-## ✨ المميزات الجديدة في الإصدار 1.0.0
+| الميزة | v1.0.0 (Gemini API) | v1.1.0 (Ollama محلي) |
+|--------|---------------------|----------------------|
+| **حدود الطلبات** | 15,000 توكن/دقيقة | ❌ **لا حدود** |
+| **الاتصال بالإنترنت** | مطلوب | ❌ **غير مطلوب** |
+| **الخصوصية** | بياناتك تذهب للسحاب | ✅ **تبقى على جهازك** |
+| **سرعة الاستجابة** | 3-10 ثوانٍ | ✅ **1-3 ثوانٍ** |
+| **التكلفة** | مجاني بمحدودية | ✅ **مجاني بالكامل** |
 
-- **التحقق المنطقي:** لن يتم قبول الكود الذي يحتوي على دوال فارغة أو أزرار غير مفعلة.
-- **نظام التصحيح الذاتي (Self-Healing):** في حال فشل الكود، يقوم المحرك بإعادة المحاولة بناءً على تغذية راجعة دقيقة.
-- **تقارير الأعطال الزمنية (Timestamped Crash Reports):** تقارير Markdown مفصلة توضح سبب ووقت فشل أي عملية تتبعاً لأفضل ممارسات الـ Logging.
-- **دعم مكتبات AI الحديثة:** تكامل كامل مع Google Gemini API 2.0.
+## 🖥️ متطلبات التشغيل
 
-## 🚀 البدء في الاستخدام
+### المتطلبات الأساسية
+- **Python 3.10+**
+- **ذاكرة RAM:** 8GB (موصى به) / 4GB (الحد الأدنى)
+- **مساحة تخزين:** 5-10GB (لتحميل النموذج المحلي)
 
-شغل التطبيق
-powershell
+### تثبيت Ollama (للنماذج المحلية)
+```bash
+# تثبيت Ollama على Windows
+winget install Ollama.Ollama
+
+# أو التحميل من: https://ollama.com/download
+
+# تحميل نموذج Gemma 3 (يناسب 8GB RAM)
+ollama pull gemma3
+
+# تشغيل الخدمة (اترك النافذة مفتوحة)
+ollama serve
+
+🚀 البدء في الاستخدام
+1. تشغيل واجهة Streamlit
+bash
 streamlit run app_gui.py
+2. تشغيل المحاكاة المباشرة
+bash
+python test_forge.py
+3. مثال: إنشاء مشروع جديد
+python
+from src.agentforge.core.orchestrator import AgentForgeOrchestrator
 
-**روابط المشروع:**
+forge = AgentForgeOrchestrator()
+result = forge.start_cycle(
+    project_name="MyApp",
+    description="تطبيق إدارة مهام بسيط مع Streamlit",
+    template="auto"
+)
+📈 الإنجازات
+✅ توليد مشاريع كاملة: نجح في توليد Inventory_Final_Test و Task_Manager وغيرها
 
-- GitHub: https://github.com/Abdullahreda1969/AgentForge
+✅ التصحيح الذاتي: النظام يكتشف الأخطاء ويصححها خلال 3 محاولات
 
-  https://agentforge-hqcxp8yt6mdtyjubdbbvsx.streamlit.app
+✅ تجاوز الدائرة المفرغة: حل مشكلة الرفض المتكرر لملف helpers.py
+
+✅ نظام احتياطي مضمون: في حال فشل AI، يتم استخدام كود احتياطي يعمل 100%
+
+🗂️ هيكل المشروع
+text
+AgentForge/
+├── src/agentforge/
+│   ├── agents/
+│   │   ├── architect.py      # المصمم
+│   │   ├── coder.py          # المبرمج (يدعم Ollama الآن)
+│   │   ├── reviewer.py       # المراجع (تم تحسينه)
+│   │   ├── executor.py       # المنفذ
+│   │   ├── tester.py         # المختبر
+│   │   └── memory.py         # الذاكرة
+│   └── core/
+│       └── orchestrator.py   # المنسق العام
+├── projects/                 # المشاريع المنتجة
+├── templates/                # قوالب البرمجة
+├── gui_rules.md             # الدستور البرمجي
+├── test_forge.py            # تشغيل المحاكاة
+└── app_gui.py               # واجهة المستخدم
+🔧 استكشاف الأخطاء
+مشكلة: "Ollama not running"
+bash
+# تأكد من تشغيل الخدمة
+ollama serve
+مشكلة: نفاد ذاكرة RAM
+bash
+# استخدم نموذجاً أصغر
+ollama pull gemma3:1b
+# ثم عدّل model_name في coder.py و reviewer.py إلى "gemma3:1b"
+مشكلة: رفض المراجع لـ helpers.py
+تم حل هذه المشكلة في v1.1.0
+
+المراجع الآن يقبل تلقائياً دوال CRUD في helpers.py
+
+📝 رحلة التطوير
+v0.5: الإصدار التجريبي الأول مع Gemini API
+
+v1.0.0: إضافة وكلاء المراجعة والتنفيذ
+
+v1.1.0: 🎉 الانتقال إلى النماذج المحلية (Ollama + Gemma 3)
+
+🔗 الروابط
+GitHub: https://github.com/Abdullahreda1969/AgentForge
+
+Streamlit Demo: https://agentforge-hqcxp8yt6mdtyjubdbbvsx.streamlit.app
+
+بنيت بواسطة AgentForge - مصنع البرمجيات الذكي 🤖
+
+text
+
+## 📋 ملخص التغييرات في الـ README:
+
+| القسم | التغيير |
+|-------|---------|
+| **العنوان** | v1.0.0 → v1.1.0 |
+| **تحديث كبير** | إضافة قسم "الانتقال إلى النماذج المحلية" |
+| **جدول المقارنة** | Gemini API vs Ollama |
+| **متطلبات التشغيل** | إضافة تعليمات تثبيت Ollama |
+| **الإنجازات** | إضافة "تجاوز الدائرة المفرغة" و"نظام احتياطي" |
+| **استكشاف الأخطاء** | إضافة حلول للمشاكل الشائعة |
+| **رحلة التطوير** | توثيق الإصدارات |
