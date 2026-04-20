@@ -18,14 +18,29 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger("AgentForge")
 
 class AgentForgeOrchestrator:
-    def __init__(self):
-        # تهيئة الوكلاء        
-        self.memory = MemoryAgent() # تفعيل الذاكرة
-        self.architect = ArchitectAgent()
-        self.coder = CoderAgent(memory=self.memory)# تمرير الذاكرة هنا
+    def __init__(self, use_local=None):
+        """
+        use_local = True  → استخدم Ollama (محلي)
+        use_local = False → استخدم Gemini API (سحاب)
+        use_local = None  → اكتشف تلقائياً
+        """
+        
+        # كشف البيئة تلقائياً
+        from detect_env import get_engine_type
+        engine = get_engine_type()
+        
+        if use_local is None:
+            use_local = (engine["environment"] == "local")
+        
+        self.use_local = use_local
+        
+        # تهيئة الوكلاء مع المحرك المناسب
+        self.memory = MemoryAgent()
+        self.architect = ArchitectAgent(use_local=use_local)
+        self.coder = CoderAgent(memory=self.memory, use_local=use_local)
         self.tester = TesterAgent()
         self.executor = ExecutorAgent()
-        self.reviewer = Reviewer()
+        self.reviewer = Reviewer(use_local=use_local)
         self.history = []
         self.project_state = {
             "name": "",
@@ -64,8 +79,14 @@ class AgentForgeOrchestrator:
         return "Template file not found, proceeding with default logic."
     
     def start_cycle(self, project_name, description, template="auto"):
-        logger.info(f"🚀 بدء المحاكاة: {project_name} | القالب: {template}")
+        # تنظيف مجلد المشروع قبل البدء
+        project_path = os.path.join("projects", project_name)
+        if os.path.exists(project_path):
+            import shutil
+            shutil.rmtree(project_path)
+            logger.info(f"🗑️ Cleaned existing project folder: {project_name}")
         
+        logger.info(f"🚀 بدء المحاكاة: {project_name} | القالب: {template}")
         # 1. جلب القواعد والذاكرة لتعزيز المناعة
         gui_rules = self._load_gui_rules() # جلب الدستور البرمجي
         memory_context = self.memory.get_context_for_coder()

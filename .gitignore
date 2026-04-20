@@ -32,3 +32,23 @@ Thumbs.db
 *.csv
 # حذفنا *.json العامة وأبقينا حماية الملفات السرية بالاسم أعلاه
 !gui_rules.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+projects/*.zip
+*.log
+credentials.json
