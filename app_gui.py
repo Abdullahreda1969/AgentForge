@@ -169,23 +169,22 @@ st.caption("Powered by AgentForge")
 def generate_via_local(project_name, description, template, auto_run, max_attempts):
     """توليد مشروع باستخدام المحرك المحلي"""
     
-    with st.spinner("💻 جاري التوليد محلياً... (30-60 ثانية)"):
+    with st.spinner("💻 جاري التوليد محلياً..."):
         try:
             af = AgentForgeOrchestrator()
             os.makedirs("projects", exist_ok=True)
             os.makedirs(os.path.join("projects", project_name), exist_ok=True)
             
+            # ✅ إزالة المعامل 'lang' و 'auto_run' و 'max_attempts'
+            # استخدم فقط المعاملات التي يقبلها start_cycle
             state = af.start_cycle(
                 project_name=project_name,
                 description=description,
-                lang="python",
-                auto_run=auto_run,
-                max_attempts=max_attempts,
                 template=template
+                # ❌ لا تمرر lang, auto_run, max_attempts
             )
             
             if state.get("status") == "completed":
-                # إنشاء ZIP
                 shutil.make_archive(f"projects/{project_name}", 'zip', f"projects/{project_name}")
                 return {
                     "success": True,
