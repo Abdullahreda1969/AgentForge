@@ -352,6 +352,46 @@ if st.button("🚀 **إطلاق عملية التصميم (Forge)**", type="prim
                 st.error("❌ فشلت المهمة. راجع التفاصيل في الـ Logs.")
                 log_to_sheets(clean_name, "Failed ❌", 0, 0)
 
+# ========== إضافة صفحة التحميل ==========
+import streamlit as st
+import os
+import mimetypes
+
+def download_page():
+    """صفحة لتحميل الملفات"""
+    query_params = st.query_params
+    filename = query_params.get("file", [None])[0]
+    
+    if filename:
+        file_path = os.path.join("projects", filename)
+        if os.path.exists(file_path):
+            with open(file_path, "rb") as f:
+                st.download_button(
+                    label="📥 اضغط هنا لتحميل الملف",
+                    data=f,
+                    file_name=filename,
+                    mime="application/zip"
+                )
+        else:
+            st.error("الملف غير موجود")
+    else:
+        st.info("لا يوجد ملف للتحميل")
+
+# في صفحة النجاح، بدلاً من رابط التحميل، استخدم زر download_button
+if result.get("success"):
+    st.success(f"🎉 تم بناء المشروع: {project_name}")
+    
+    # قراءة ملف ZIP
+    zip_path = f"projects/{project_name}.zip"
+    if os.path.exists(zip_path):
+        with open(zip_path, "rb") as fp:
+            st.download_button(
+                label=f"📥 تحميل {project_name}.zip",
+                data=fp,
+                file_name=f"{project_name}.zip",
+                mime="application/zip"
+            )
+
 # ========== تذييل الصفحة ==========
 st.markdown("---")
 st.caption("صُنع بكل حب بواسطة AgentForge - 2026")
