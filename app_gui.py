@@ -23,80 +23,138 @@ st.set_page_config(
 
 # ========== دالة توليد المشروع عبر السحاب ==========
 def generate_via_cloud(project_name, description, template):
-    """توليد مشروع باستخدام قالب جاهز (بدون AI)"""
+    """توليد مشروع باستخدام Gemini API مباشرة"""
     
-    # إنشاء مجلد المشروع
+    # الحصول على المفتاح
+    try:
+        API_KEY = st.secrets["GEMINI_API_KEY"]
+    except:
+        API_KEY = os.getenv("GEMINI_API_KEY")
+    
+    if not API_KEY:
+        st.error("❌ مفتاح Gemini API غير متوفر")
+        return None
+    
+    GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={API_KEY}"
+    
+    with st.spinner("☁️ جاري التوليد..."):
+        try:
+            # ✅ بناء prompt بسيط وواضح
+            prompt = f"""Create a complete Streamlit application.
+
+User request: {description}
+Project name: {project_name}
+
+Requirements:
+1. Generate 4 files: main.py, config.py, helpers.py, start_app.bat
+2. main.py must contain the full Streamlit UI
+3. helpers.py must contain business logic
+4. config.py for configuration
+5. start_app.bat to run the app
+
+Return ONLY valid JSON. Example format:
+{{"files": {{"main.py": "code", "config.py": "code", "helpers.py": "code", "start_app.bat": "code"}}}}"""
+            
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": 4096
+                }
+            }
+            
+            response = requests.post(GEMINI_URL, json=payload, timeout=90)
+            result = response.json()
+            
+            # طباعة للتصحيح (ستظهر في logs)
+            print(f"Gemini Response: {result}")
+            
+            if "candidates" in result and len(result["candidates"]) > 0:
+                raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
+                
+                # استخراج JSON
+                json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+                if json_match:
+                    data = json.loads(json_match.group())
+                    files = data.get("files", {})
+                    
+                    # إنشاء المشروع
+                    project_path = os.path.join("projects", project_name)
+                    os.makedirs(project_path, exist_ok=True)
+                    
+                    for filename, code in files.items():
+                        with open(os.path.join(project_path, filename), "w", encoding="utf-8") as f:
+                            f.write(code)
+                    
+                    # إضافة start_app.bat إذا لم يكن موجوداً
+                    bat_path = os.path.join(project_path, "start_app.bat")
+                    if not os.path.exists(bat_path):
+                        with open(bat_path, "w") as f:
+                            f.write("@echo off\nstreamlit run main.py\npause")
+                    
+                    shutil.make_archive(f"projects/{project_name}", 'zip', project_path)
+                    
+                    return {
+                        "success": True,
+                        "project_id": project_name,
+                        "files_generated": list(files.keys()),
+                        "message": f"✅ {project_name} created successfully"
+                    }
+            
+            # إذا فشل Gemini، استخدم القالب العام
+            return generate_fallback_project(project_name, description)
+            
+        except Exception as e:
+            st.warning(f"⚠️ Gemini error: {e}")
+            return generate_fallback_project(project_name, description)
+
+def generate_fallback_project(project_name, description):
+    """قالب عام عندما يفشل Gemini"""
+    
     project_path = os.path.join("projects", project_name)
     os.makedirs(project_path, exist_ok=True)
     
-    # كود آلة حاسبة بسيط وجاهز
-    calculator_code = '''import streamlit as st
+    # كود عام يعمل لأي مشروع
+    generic_code = f'''import streamlit as st
 
-st.set_page_config(page_title="Calculator", page_icon="🧮")
-st.title("🧮 Simple Calculator")
+st.set_page_config(page_title="{project_name}", page_icon="🚀")
+st.title("{project_name}")
 
-st.markdown("---")
+st.markdown(f"### Based on: {description}")
 
-col1, col2 = st.columns(2)
+# Simple template
+st.info("This is a generic template. For custom apps, try again or use local mode.")
 
-with col1:
-    num1 = st.number_input("Enter first number", value=0.0, step=0.1)
-
-with col2:
-    num2 = st.number_input("Enter second number", value=0.0, step=0.1)
-
-operation = st.selectbox(
-    "Select operation",
-    ["➕ Add", "➖ Subtract", "✖️ Multiply", "➗ Divide"]
-)
-
-if st.button("Calculate", type="primary"):
-    if operation == "➕ Add":
-        result = num1 + num2
-        symbol = "+"
-    elif operation == "➖ Subtract":
-        result = num1 - num2
-        symbol = "-"
-    elif operation == "✖️ Multiply":
-        result = num1 * num2
-        symbol = "×"
-    else:  # Divide
-        if num2 != 0:
-            result = num1 / num2
-            symbol = "÷"
-        else:
-            result = "Error: Division by zero"
-            symbol = "÷"
-    
-    if isinstance(result, (int, float)):
-        st.success(f"✅ {num1} {symbol} {num2} = {result}")
-    else:
-        st.error(result)
+user_input = st.text_input("Enter something:")
+if st.button("Process"):
+    st.success(f"You entered: {{user_input}}")
 
 st.markdown("---")
 st.caption("Powered by AgentForge")
 '''
     
-    # حفظ الملفات
-    files = {
-        "main.py": calculator_code,
-        "config.py": "# Configuration\nAPP_NAME = 'Calculator'\nVERSION = '1.0'",
-        "helpers.py": "# Helper functions\ndef add(a, b): return a + b\ndef subtract(a, b): return a - b\ndef multiply(a, b): return a * b\ndef divide(a, b): return a / b if b != 0 else None",
-        "start_app.bat": "@echo off\nstreamlit run main.py\npause"
-    }
+    with open(os.path.join(project_path, "main.py"), "w", encoding="utf-8") as f:
+        f.write(generic_code)
     
-    for filename, code in files.items():
-        with open(os.path.join(project_path, filename), "w", encoding="utf-8") as f:
-            f.write(code)
+    # config.py
+    with open(os.path.join(project_path, "config.py"), "w") as f:
+        f.write("# Configuration\nAPP_NAME = '" + project_name + "'\nVERSION = '1.0'")
     
-    # إنشاء ZIP
+    # helpers.py
+    with open(os.path.join(project_path, "helpers.py"), "w") as f:
+        f.write("# Helper functions\ndef process(data):\n    return data")
+    
+    # start_app.bat
+    with open(os.path.join(project_path, "start_app.bat"), "w") as f:
+        f.write("@echo off\nstreamlit run main.py\npause")
+    
     shutil.make_archive(f"projects/{project_name}", 'zip', project_path)
     
     return {
         "success": True,
         "project_id": project_name,
-        "files_generated": list(files.keys()),
-        "message": f"Project '{project_name}' generated successfully"
+        "files_generated": ["main.py", "config.py", "helpers.py", "start_app.bat"],
+        "message": f"✅ {project_name} created (generic template)"
     }
 
 # ========== دالة توليد المشروع محلياً ==========
