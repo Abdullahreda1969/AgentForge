@@ -23,81 +23,81 @@ st.set_page_config(
 
 # ========== دالة توليد المشروع عبر السحاب ==========
 def generate_via_cloud(project_name, description, template):
-    """توليد مشروع باستخدام Gemini API مباشرة"""
+    """توليد مشروع باستخدام قالب جاهز (بدون AI)"""
     
-    # الحصول على المفتاح من Secrets
-    try:
-        API_KEY = st.secrets["GEMINI_API_KEY"]
-    except:
-        API_KEY = os.getenv("GEMINI_API_KEY")
+    # إنشاء مجلد المشروع
+    project_path = os.path.join("projects", project_name)
+    os.makedirs(project_path, exist_ok=True)
     
-    if not API_KEY:
-        st.error("❌ مفتاح Gemini API غير متوفر. يرجى إضافته في Settings → Secrets")
-        return None
+    # كود آلة حاسبة بسيط وجاهز
+    calculator_code = '''import streamlit as st
+
+st.set_page_config(page_title="Calculator", page_icon="🧮")
+st.title("🧮 Simple Calculator")
+
+st.markdown("---")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    num1 = st.number_input("Enter first number", value=0.0, step=0.1)
+
+with col2:
+    num2 = st.number_input("Enter second number", value=0.0, step=0.1)
+
+operation = st.selectbox(
+    "Select operation",
+    ["➕ Add", "➖ Subtract", "✖️ Multiply", "➗ Divide"]
+)
+
+if st.button("Calculate", type="primary"):
+    if operation == "➕ Add":
+        result = num1 + num2
+        symbol = "+"
+    elif operation == "➖ Subtract":
+        result = num1 - num2
+        symbol = "-"
+    elif operation == "✖️ Multiply":
+        result = num1 * num2
+        symbol = "×"
+    else:  # Divide
+        if num2 != 0:
+            result = num1 / num2
+            symbol = "÷"
+        else:
+            result = "Error: Division by zero"
+            symbol = "÷"
     
-    GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={API_KEY}"
+    if isinstance(result, (int, float)):
+        st.success(f"✅ {num1} {symbol} {num2} = {result}")
+    else:
+        st.error(result)
+
+st.markdown("---")
+st.caption("Powered by AgentForge")
+'''
     
-    with st.spinner("☁️ جاري التوليد على السحاب... (30-60 ثانية)"):
-        try:
-            # ✅ prompt مبسط بدون مشاكل في التنسيق
-            prompt = f"""
-            Generate a complete Python Streamlit application.
-            
-            Project Name: {project_name}
-            Description: {description}
-            
-            Create a simple calculator app with basic operations (add, subtract, multiply, divide).
-            
-            Return ONLY valid JSON with this structure:
-            {{
-                "files": {{
-                    "main.py": "import streamlit as st\\n\\nst.title('Calculator')\\n\\nnum1 = st.number_input('Enter first number', value=0.0)\\nnum2 = st.number_input('Enter second number', value=0.0)\\noperation = st.selectbox('Select operation', ['Add', 'Subtract', 'Multiply', 'Divide'])\\n\\nif st.button('Calculate'):\\n    if operation == 'Add':\\n        result = num1 + num2\\n    elif operation == 'Subtract':\\n        result = num1 - num2\\n    elif operation == 'Multiply':\\n        result = num1 * num2\\n    elif operation == 'Divide':\\n        if num2 != 0:\\n            result = num1 / num2\\n        else:\\n            result = 'Error: Division by zero'\\n    st.success(f'Result: {{result}}')",
-                    "config.py": "# Configuration file\\nAPP_NAME = 'Calculator App'\\nVERSION = '1.0'",
-                    "helpers.py": "# Helper functions\\ndef validate_numbers(a, b):\\n    try:\\n        return float(a), float(b)\\n    except ValueError:\\n        return None, None",
-                    "start_app.bat": "@echo off\\nstreamlit run main.py\\npause"
-                }}
-            }}
-            """
-            
-            payload = {"contents": [{"parts": [{"text": prompt}]}]}
-            response = requests.post(GEMINI_URL, json=payload, timeout=90)
-            result = response.json()
-            
-            if "candidates" in result:
-                raw_text = result['candidates'][0]['content']['parts'][0]['text']
-                json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-                if json_match:
-                    files_data = json.loads(json_match.group())
-                    files = files_data.get("files", {})
-                    
-                    # إنشاء مجلد المشروع
-                    project_path = os.path.join("projects", project_name)
-                    os.makedirs(project_path, exist_ok=True)
-                    
-                    # حفظ الملفات
-                    for filename, code in files.items():
-                        with open(os.path.join(project_path, filename), "w", encoding="utf-8") as f:
-                            f.write(code)
-                    
-                    # إنشاء ZIP
-                    shutil.make_archive(f"projects/{project_name}", 'zip', project_path)
-                    
-                    return {
-                        "success": True,
-                        "project_id": project_name,
-                        "files_generated": list(files.keys()),
-                        "message": f"Project '{project_name}' generated successfully"
-                    }
-            
-            st.error("❌ فشل في تحليل الرد من Gemini")
-            return None
-            
-        except json.JSONDecodeError as e:
-            st.error(f"❌ خطأ في تحليل JSON: {e}")
-            return None
-        except Exception as e:
-            st.error(f"❌ خطأ في الاتصال: {e}")
-            return None
+    # حفظ الملفات
+    files = {
+        "main.py": calculator_code,
+        "config.py": "# Configuration\nAPP_NAME = 'Calculator'\nVERSION = '1.0'",
+        "helpers.py": "# Helper functions\ndef add(a, b): return a + b\ndef subtract(a, b): return a - b\ndef multiply(a, b): return a * b\ndef divide(a, b): return a / b if b != 0 else None",
+        "start_app.bat": "@echo off\nstreamlit run main.py\npause"
+    }
+    
+    for filename, code in files.items():
+        with open(os.path.join(project_path, filename), "w", encoding="utf-8") as f:
+            f.write(code)
+    
+    # إنشاء ZIP
+    shutil.make_archive(f"projects/{project_name}", 'zip', project_path)
+    
+    return {
+        "success": True,
+        "project_id": project_name,
+        "files_generated": list(files.keys()),
+        "message": f"Project '{project_name}' generated successfully"
+    }
 
 # ========== دالة توليد المشروع محلياً ==========
 def generate_via_local(project_name, description, template, auto_run, max_attempts):
