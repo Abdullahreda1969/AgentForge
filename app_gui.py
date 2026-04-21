@@ -141,43 +141,80 @@ def create_zip(project_name):
 
 # ========== دالة توليد المشروع عبر السحاب (API) ==========
 def generate_via_cloud(project_name, description, template):
-    """توليد مشروع باستخدام API السحابي"""
+    """توليد مشروع باستخدام Gemini API مباشرة"""
     
-    # عنوان API - سننشره لاحقاً
-    API_URL = os.getenv("AGENTFORGE_API_URL", "https://agentforge-api.onrender.com")
-    API_KEY = os.getenv("AGENTFORGE_API_KEY", st.secrets.get("API_KEY", ""))
+    # ✅ استخدام المفتاح الصحيح من Secrets
+    try:
+        API_KEY = st.secrets["GEMINI_API_KEY"]
+    except:
+        API_KEY = os.getenv("GEMINI_API_KEY")
     
     if not API_KEY:
-        st.error("❌ مفتاح API غير متوفر. يرجى التواصل مع الدعم.")
+        st.error("❌ مفتاح Gemini API غير متوفر. يرجى إضافته في Settings → Secrets")
+        st.info("💡 المفتاح يجب أن يكون تحت الاسم: GEMINI_API_KEY")
         return None
     
-    with st.spinner("☁️ جاري التوليد على السحاب... (30-90 ثانية)"):
+    # عنوان Gemini API
+    GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={API_KEY}"
+    
+    with st.spinner("☁️ جاري التوليد على السحاب... (30-60 ثانية)"):
         try:
-            response = requests.post(
-                f"{API_URL}/v1/generate",
-                headers={
-                    "Content-Type": "application/json",
-                    "X-API-Key": API_KEY
-                },
-                json={
-                    "description": description,
-                    "project_name": project_name,
-                    "project_type": "auto",
-                    "template": template
-                },
-                timeout=120
-            )
+            # بناء الـ prompt
+            prompt = f"""
+            You are an expert Python developer. Generate a complete Streamlit application based on this description:
             
-            if response.status_code == 200:
-                result = response.json()
-                return result
-            else:
-                st.error(f"❌ فشل التوليد: {response.text}")
-                return None
-                
-        except requests.exceptions.Timeout:
-            st.error("❌ انتهى وقت الانتظار. الخادم قد يكون مشغولاً، حاول مرة أخرى.")
+            Project Name: {project_name}
+            Description: {description}
+            
+            Generate ALL these files as a single JSON response:
+            - config.py (configuration and environment variables)
+            - database.py (SQLAlchemy models if needed)
+            - helpers.py (business logic and helper functions)
+            - main.py (Streamlit UI)
+            - start_app.bat (batch file to run the app)
+            
+            Return ONLY valid JSON with this structure:
+            {{
+                "files": {{
+                    "config.py": "code here",
+                    "database.py": "code here",
+                    "helpers.py": "code here",
+                    "main.py": "code here",
+                    "start_app.bat": "code here"
+                }}
+            }}
+            """
+            
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": 8192
+                }
+            }
+            
+            response = requests.post(GEMINI_URL, json=payload, timeout=90)
+            result = response.json()
+            
+            if "candidates" in result:
+                raw_text = result['candidates'][0]['content']['parts'][0]['text']
+                # تنظيف النص واستخراج JSON
+                import json
+                import re
+                json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+                if json_match:
+                    files_data = json.loads(json_match.group())
+                    return {
+                        "success": True,
+                        "project_id": project_name,
+                        "files_generated": list(files_data.get("files", {}).keys()),
+                        "download_url": None,  # سيتم إنشاء ZIP لاحقاً
+                        "files": files_data.get("files", {})
+                    }
+            
+            st.error("❌ فشل في تحليل الرد من Gemini")
             return None
+                
         except Exception as e:
             st.error(f"❌ خطأ في الاتصال: {e}")
             return None
