@@ -20,7 +20,15 @@ st.set_page_config(
     page_icon="🚀",
     layout="wide"
 )
-
+# في بداية الملف، بعد import streamlit
+try:
+    if "GEMINI_API_KEY" in st.secrets:
+        st.sidebar.success("✅ Gemini API key found")
+    else:
+        st.sidebar.error("❌ Gemini API key NOT found in secrets")
+        st.sidebar.info("Available keys: " + ", ".join(st.secrets.keys()))
+except:
+    st.sidebar.error("❌ No secrets found")
 # ========== دالة توليد المشروع عبر السحاب ==========
 def generate_via_cloud(project_name, description, template):
     """توليد مشروع باستخدام Gemini API مباشرة"""

@@ -78,7 +78,7 @@ class AgentForgeOrchestrator:
                 return f.read()
         return "Template file not found, proceeding with default logic."
     
-    def start_cycle(self, project_name, description, template="auto"):
+    def start_cycle(self, project_name, description, template="auto", lang="python", auto_run=True, max_attempts=3):
         # تنظيف مجلد المشروع قبل البدء
         project_path = os.path.join("projects", project_name)
         if os.path.exists(project_path):
@@ -87,6 +87,10 @@ class AgentForgeOrchestrator:
             logger.info(f"🗑️ Cleaned existing project folder: {project_name}")
         
         logger.info(f"🚀 بدء المحاكاة: {project_name} | القالب: {template}")
+         # ✅ تخزين المعاملات لاستخدامها لاحقاً
+        self.project_state["language"] = lang
+        self.project_state["auto_run"] = auto_run
+        self.project_state["max_attempts"] = max_attempts
         # 1. جلب القواعد والذاكرة لتعزيز المناعة
         gui_rules = self._load_gui_rules() # جلب الدستور البرمجي
         memory_context = self.memory.get_context_for_coder()
