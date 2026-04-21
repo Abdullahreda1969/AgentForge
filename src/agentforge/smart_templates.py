@@ -1,14 +1,46 @@
 # src/agentforge/smart_templates.py
+# القوالب الذكية الموحدة - تضمن عمل جميع التطبيقات المنتجة
 
 class SmartTemplates:
-    """قوالب ذكية تتكيف مع نوع المشروع"""
+    """قوالب ذكية موحدة لجميع أنواع المشاريع"""
     
     @staticmethod
-    def get_database_template(project_type):
-        """قالب database.py - ثابت 100%"""
-        return '''
-# database.py
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
+    def get_config_template():
+        """قالب config.py - يحتوي على جميع المتغيرات الأساسية"""
+        
+        return '''# config.py
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Database
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
+
+# App settings
+APP_NAME = os.getenv("APP_NAME", "My Application")
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
+# متغيرات عامة (لمنع أخطاء الاستيراد)
+PRIORITIES = {
+    "High": 3,
+    "Medium": 2,
+    "Low": 1
+}
+
+# متغيرات خاصة بأنواع المشاريع المختلفة
+TASK_PRIORITIES = PRIORITIES
+CONTACT_PRIORITIES = PRIORITIES
+PRODUCT_CATEGORIES = ["Electronics", "Clothing", "Food", "Other"]
+STATUS_OPTIONS = ["Pending", "In Progress", "Completed"]
+'''
+    
+    @staticmethod
+    def get_database_template():
+        """قالب database.py - نماذج SQLAlchemy"""
+        
+        return '''# database.py
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -30,89 +62,41 @@ class Item(Base):
 
 Base.metadata.create_all(bind=engine)
 '''
-
-    @staticmethod
-    def get_config_template():
-        """قالب config.py - ثابت"""
-        return '''
-# config.py
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
-APP_NAME = os.getenv("APP_NAME", "My Application")
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
-'''
-
+    
     @staticmethod
     def get_helpers_template(project_type, item_name):
-        """قالب helpers.py - ذكي (هيكل ثابت، أسماء متغيرة)"""
+        """قالب helpers.py - دوال CRUD بأسماء مناسبة"""
         
-        templates_map = {
-            "task": {
-                "items": "tasks",
-                "item": "task",
-                "fields": "name: str, description: str = ''",  # ✅ changed from 'title' to 'name'
-                "assign": "name=name, description=description"  # ✅保持一致
-            },
-            "contact": {
-                "items": "contacts",
-                "item": "contact",
-                "fields": "name: str, phone: str = '', email: str = ''",
-                "assign": "name=name, phone=phone, email=email"
-            },
-            "product": {
-                "items": "products",
-                "item": "product",
-                "fields": "name: str, price: float = 0.0, quantity: int = 0",
-                "assign": "name=name, price=price, quantity=quantity"
-            },
-            "expense": {
-                "items": "expenses",
-                "item": "expense",
-                "fields": "description: str, amount: float, category: str = ''",
-                "assign": "description=description, amount=amount, category=category"
-            }
-        }
+        items_name = f"{item_name}s"
         
-        template = templates_map.get(project_type, {
-            "items": f"{item_name}s",
-            "item": item_name,
-            "fields": "name: str, description: str = ''",
-            "assign": "name=name, description=description"
-        })
-        
-        return f'''
-# helpers.py
+        return f'''# helpers.py
 from sqlalchemy.orm import Session
 from database import SessionLocal, Item
 from typing import List, Optional
 
-def get_{template["items"]}() -> List[Item]:
-    """جلب جميع {template["items"]}"""
+def get_{items_name}() -> List[Item]:
+    """جلب جميع {items_name}"""
     with SessionLocal() as db:
         return db.query(Item).all()
 
-def get_{template["item"]}_by_id({template["item"]}_id: int) -> Optional[Item]:
-    """جلب {template["item"]} محدد بالمعرف"""
+def get_{item_name}_by_id({item_name}_id: int) -> Optional[Item]:
+    """جلب {item_name} محدد بالمعرف"""
     with SessionLocal() as db:
-        return db.query(Item).filter(Item.id == {template["item"]}_id).first()
+        return db.query(Item).filter(Item.id == {item_name}_id).first()
 
-def add_{template["item"]}({template["fields"]}) -> Item:
-    """إضافة {template["item"]} جديد"""
+def add_{item_name}(name: str, description: str = "") -> Item:
+    """إضافة {item_name} جديد"""
     with SessionLocal() as db:
-        item = Item({template["assign"]})
+        item = Item(name=name, description=description)
         db.add(item)
         db.commit()
         db.refresh(item)
         return item
 
-def update_{template["item"]}({template["item"]}_id: int, **kwargs) -> bool:
-    """تحديث {template["item"]}"""
+def update_{item_name}({item_name}_id: int, **kwargs) -> bool:
+    """تحديث {item_name}"""
     with SessionLocal() as db:
-        item = db.query(Item).filter(Item.id == {template["item"]}_id).first()
+        item = db.query(Item).filter(Item.id == {item_name}_id).first()
         if item:
             for key, value in kwargs.items():
                 if hasattr(item, key):
@@ -121,47 +105,54 @@ def update_{template["item"]}({template["item"]}_id: int, **kwargs) -> bool:
             return True
         return False
 
-def delete_{template["item"]}({template["item"]}_id: int) -> bool:
-    """حذف {template["item"]}"""
+def delete_{item_name}({item_name}_id: int) -> bool:
+    """حذف {item_name}"""
     with SessionLocal() as db:
-        item = db.query(Item).filter(Item.id == {template["item"]}_id).first()
+        item = db.query(Item).filter(Item.id == {item_name}_id).first()
         if item:
             db.delete(item)
             db.commit()
             return True
         return False
 '''
-
+    
     @staticmethod
     def get_main_template(project_type, item_name):
-        """قالب main.py - مرن (تصميم حر)"""
+        """قالب main.py - واجهة Streamlit موحدة"""
         
-        templates_map = {
+        items_name = f"{item_name}s"
+        
+        # عنوان حسب نوع المشروع
+        titles = {
             "task": "📝 Task Manager",
             "contact": "📞 Contact Book",
             "product": "📦 Inventory Management",
             "expense": "💰 Expense Tracker"
         }
+        title = titles.get(project_type, f"📱 {item_name.title()} Manager")
         
-        title = templates_map.get(project_type, f"📱 {item_name.title()} Manager")
-        items_name = f"{item_name}s"
-        
-        return f'''
-# main.py
+        return f'''# main.py
+import streamlit as st
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-import streamlit as st
-from helpers import get_{items_name}, add_{item_name}, delete_{item_name}
+# استيراد آمن - لا يفترض وجود متغيرات معينة
+try:
+    from config import *
+except ImportError:
+    # قيم افتراضية إذا فشل الاستيراد
+    pass
+
+try:
+    from helpers import get_{items_name}, add_{item_name}, delete_{item_name}
+except ImportError as e:
+    st.error(f"خطأ في استيراد الدوال المساعدة: {{e}}")
+    st.stop()
 
 st.set_page_config(page_title="{title}", layout="wide")
 st.title(f"{title}")
-
-# Initialize session state
-if 'refresh' not in st.session_state:
-    st.session_state.refresh = False
 
 # Sidebar for adding items
 with st.sidebar:
@@ -169,23 +160,24 @@ with st.sidebar:
     with st.form("add_form"):
         name = st.text_input(f"{item_name.title()} Name")
         description = st.text_area("Description (optional)")
-        submitted = st.form_submit_button(f"➕ Add {item_name.title()}")
+        submitted = st.form_submit_button(f"➕ Add")
         
         if submitted and name:
-            add_{item_name}(name=name, description=description)
-            st.success(f"Added: {{name}}")
-            st.session_state.refresh = True
-            st.rerun()
+            try:
+                add_{item_name}(name=name, description=description)
+                st.success(f"Added: {{name}}")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error adding: {{e}}")
 
-# Main area - display items
+# Main area
 st.header(f"{items_name.title()} List")
 
-# Refresh data if needed
-if st.session_state.refresh:
-    st.session_state.refresh = False
-
-# Get and display items
-items = get_{items_name}()
+try:
+    items = get_{items_name}()
+except Exception as e:
+    st.error(f"Error loading items: {{e}}")
+    items = []
 
 if not items:
     st.info(f"No {items_name} yet. Add one from the sidebar!")
@@ -200,11 +192,50 @@ else:
             st.write(f"ID: {{item.id}}")
         with col3:
             if st.button("🗑️ Delete", key=f"del_{{item.id}}"):
-                if delete_{item_name}(item.id):
-                    st.success(f"Deleted: {{item.name}}")
+                try:
+                    delete_{item_name}(item.id)
                     st.rerun()
+                except Exception as e:
+                    st.error(f"Error deleting: {{e}}")
 
-# Footer
 st.markdown("---")
-st.caption(f"Powered by AgentForge - {{len(items)}} {items_name} total")
+st.caption("Powered by AgentForge")
 '''
+    
+    @staticmethod
+    def get_start_app_template():
+        """قالب start_app.bat"""
+        return '''@echo off
+streamlit run main.py
+pause
+'''
+    
+    @staticmethod
+    def detect_project_type(description):
+        """تحديد نوع المشروع من الوصف"""
+        desc_lower = description.lower()
+        
+        if any(word in desc_lower for word in ['task', 'todo', 'مهمة', 'مهام', 'to do']):
+            return "task"
+        if any(word in desc_lower for word in ['contact', 'phone', 'جهة', 'اتصال', 'عنوان']):
+            return "contact"
+        if any(word in desc_lower for word in ['product', 'inventory', 'منتج', 'مخزون']):
+            return "product"
+        if any(word in desc_lower for word in ['expense', 'money', 'مصروف', 'مالية']):
+            return "expense"
+        if any(word in desc_lower for word in ['calculator', 'حاسبة']):
+            return "calculator"
+        
+        return "general"
+    
+    @staticmethod
+    def detect_item_name(description, project_type):
+        """استخراج اسم العنصر من الوصف"""
+        names = {
+            "task": "task",
+            "contact": "contact",
+            "product": "product",
+            "expense": "expense",
+            "calculator": "calculation"
+        }
+        return names.get(project_type, "item")
