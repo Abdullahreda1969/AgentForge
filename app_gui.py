@@ -1,149 +1,31 @@
-# app_gui.py - النسخة المطورة مع دعم الثنائية
-
+# app_gui.py - النسخة المصححة
 import streamlit as st
 import sys
 import os
 import requests
 import json
 import shutil
-import gspread
-from google.oauth2.service_account import Credentials
+import re
 from datetime import datetime
-import secrets
 
-# ========== إعداد المسارات ==========
-current_dir = os.path.dirname(os.path.abspath(__file__))
-src_path = os.path.join(current_dir, "src")
-if src_path not in sys.path:
-    sys.path.append(src_path)
+# إضافة مسار src
+sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 
-# استيراد المحرك المحلي (سيستخدم لاحقاً)
+# استيراد المحرك المحلي
 from agentforge.core.orchestrator import AgentForgeOrchestrator
 
 # ========== إعدادات الصفحة ==========
 st.set_page_config(
-    page_title="AgentForge AI", 
-    page_icon="🚀", 
-    layout="wide",  # تغيير إلى wide لاستيعاب الأعمدة
-    initial_sidebar_state="expanded"
+    page_title="AgentForge AI",
+    page_icon="🚀",
+    layout="wide"
 )
 
-# ========== القائمة الجانبية (مع خيارات التشغيل) ==========
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/1698/1698535.png", width=80)
-    st.title("AgentForge 🤖")
-    
-    st.markdown("---")
-    st.markdown("## ⚙️ طريقة التشغيل")
-    
-    # ❗ هذا هو الخيار الجديد - قلب الثنائية
-    execution_mode = st.radio(
-        "اختر الطريقة المناسبة لك:",
-        options=["☁️ **السحابي (Cloud API)**", "💻 **محلي (Local Engine)**"],
-        help="""
-        - ☁️ السحابي: يعمل فوراً، لا تحتاج تثبيت، مناسب للتجربة والاستخدام السريع
-        - 💻 المحلي: يشغل المحرك على جهازك، مناسب للمطورين والشركات
-        """
-    )
-    
-    st.markdown("---")
-    st.subheader("⚙️ إعدادات المحرك")
-    
-    # إعدادات تظهر فقط عند اختيار "محلي"
-    if "محلي" in execution_mode:
-        auto_run = st.checkbox("تشغيل الكود تلقائياً (Auto-Run)", value=True)
-        max_attempts = st.slider("أقصى عدد لمحاولات التصحيح", 1, 5, 3)
-    
-    # إعدادات تظهر فقط عند اختيار "سحابي"
-    if "سحابي" in execution_mode:
-        st.info("🔑 سيتم استخدام مفتاح API الخاص بك تلقائياً")
-        st.caption("لديك 100 طلب مجاني شهرياً")
-    
-    st.markdown("---")
-    st.subheader("🎯 محاكاة القوالب (Templates)")
-    template_options = {
-        "Auto-Detect ✨": "auto",
-        "Streamlit Web App 🌐": "streamlit_web",
-        "Tkinter Desktop 🖥️": "tkinter_desktop",
-        "Automation Script ⚙️": "automation_script",
-        "Pure Python Logic 🐍": "pure_python"
-    }
-    selected_template_label = st.selectbox("اختر قالب المحاكاة:", list(template_options.keys()))
-    selected_template_value = template_options[selected_template_label]
-    
-    st.markdown("---")
-    st.info(f"إصدار المحرك: v1.0.0")
-    
-    # عرض حالة الاتصال بـ Google Sheets
-    try:
-        if "gcp_service_account" in st.secrets:
-            st.success("✅ متصل بالسحاب (Secrets)")
-        elif os.path.exists("credentials.json"):
-            st.success("✅ متصل محلياً (credentials.json)")
-        else:
-            st.warning("⚠️ Google Sheets غير متصل")
-    except Exception:
-        pass
-
-# ========== دالة تسجيل البيانات في Google Sheets (موجودة بالفعل) ==========
-def log_to_sheets(project_name, status, file_count, duration):
-    try:
-        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-        creds_info = None
-
-        try:
-            creds_info = dict(st.secrets["gcp_service_account"])
-        except Exception:
-            if os.path.exists("credentials.json"):
-                import json
-                with open("credentials.json", "r") as f:
-                    creds_info = json.load(f)
-        
-        if not creds_info:
-            return False
-
-        if 'private_key' in creds_info:
-            creds_info['private_key'] = creds_info['private_key'].replace('\\n', '\n')
-            
-        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
-        client = gspread.authorize(creds)
-        
-        sheet_url = "https://docs.google.com/spreadsheets/d/1gWF-LQ4MQqgUJx2GVbno_2BplQBGQBuU8goQBTT1Bl4/edit"
-        sheet = client.open_by_url(sheet_url).sheet1
-        
-        new_row = [
-            project_name, 
-            status, 
-            file_count, 
-            f"{duration}s", 
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Cloud" if "سحابي" in execution_mode else "Local"
-        ]
-        sheet.append_row(new_row)
-        return True
-    except Exception as e:
-        st.error(f"⚠️ فشل المزامنة مع Google Sheets: {e}")
-        return False
-
-# ========== دالة إنشاء ZIP (موجودة بالفعل) ==========
-def create_zip(project_name):
-    source_dir = os.path.join("projects", project_name)
-    zip_filename = project_name
-    target_zip_path = os.path.join("projects", f"{zip_filename}.zip")
-    
-    if os.path.exists(source_dir):
-        shutil.make_archive(zip_filename, 'zip', source_dir)
-        if os.path.exists(target_zip_path):
-            os.remove(target_zip_path)
-        shutil.move(f"{zip_filename}.zip", target_zip_path)
-        return target_zip_path
-    return None
-
-# ========== دالة توليد المشروع عبر السحاب (API) ==========
+# ========== دالة توليد المشروع عبر السحاب ==========
 def generate_via_cloud(project_name, description, template):
     """توليد مشروع باستخدام Gemini API مباشرة"""
     
-    # ✅ استخدام المفتاح الصحيح من Secrets
+    # الحصول على المفتاح من Secrets
     try:
         API_KEY = st.secrets["GEMINI_API_KEY"]
     except:
@@ -151,89 +33,74 @@ def generate_via_cloud(project_name, description, template):
     
     if not API_KEY:
         st.error("❌ مفتاح Gemini API غير متوفر. يرجى إضافته في Settings → Secrets")
-        st.info("💡 المفتاح يجب أن يكون تحت الاسم: GEMINI_API_KEY")
         return None
     
-    # عنوان Gemini API
     GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={API_KEY}"
     
     with st.spinner("☁️ جاري التوليد على السحاب... (30-60 ثانية)"):
         try:
-            # بناء الـ prompt
             prompt = f"""
-            You are an expert Python developer. Generate a complete Streamlit application based on this description:
+            Generate a complete Streamlit application for: {description}
+            Project name: {project_name}
             
-            Project Name: {project_name}
-            Description: {description}
-            
-            Generate ALL these files as a single JSON response:
-            - config.py (configuration and environment variables)
-            - database.py (SQLAlchemy models if needed)
-            - helpers.py (business logic and helper functions)
-            - main.py (Streamlit UI)
-            - start_app.bat (batch file to run the app)
-            
-            Return ONLY valid JSON with this structure:
+            Return ONLY valid JSON with this exact structure:
             {{
                 "files": {{
-                    "config.py": "code here",
-                    "database.py": "code here",
-                    "helpers.py": "code here",
-                    "main.py": "code here",
-                    "start_app.bat": "code here"
+                    "config.py": "import os\\nfrom dotenv import load_dotenv\\nload_dotenv()\\nDATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///app.db')",
+                    "database.py": "from sqlalchemy import create_engine, Column, Integer, String\\nfrom sqlalchemy.ext.declarative import declarative_base\\nfrom sqlalchemy.orm import sessionmaker\\nimport os\\n\\nDATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///app.db')\\nengine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False})\\nSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)\\nBase = declarative_base()",
+                    "helpers.py": "# Helper functions\\ndef get_data():\\n    return []",
+                    "main.py": "import streamlit as st\\nst.title('My App')\\nst.write('Welcome to your generated app!')",
+                    "start_app.bat": "@echo off\\nstreamlit run main.py\\npause"
                 }}
             }}
             """
             
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.2,
-                    "maxOutputTokens": 8192
-                }
-            }
-            
+            payload = {"contents": [{"parts": [{"text": prompt}]}]}
             response = requests.post(GEMINI_URL, json=payload, timeout=90)
             result = response.json()
             
             if "candidates" in result:
                 raw_text = result['candidates'][0]['content']['parts'][0]['text']
-                # تنظيف النص واستخراج JSON
-                import json
-                import re
                 json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
                 if json_match:
                     files_data = json.loads(json_match.group())
+                    files = files_data.get("files", {})
+                    
+                    # إنشاء مجلد المشروع
+                    project_path = os.path.join("projects", project_name)
+                    os.makedirs(project_path, exist_ok=True)
+                    
+                    # حفظ الملفات
+                    for filename, code in files.items():
+                        with open(os.path.join(project_path, filename), "w", encoding="utf-8") as f:
+                            f.write(code)
+                    
+                    # إنشاء ZIP
+                    shutil.make_archive(f"projects/{project_name}", 'zip', project_path)
+                    
                     return {
                         "success": True,
                         "project_id": project_name,
-                        "files_generated": list(files_data.get("files", {}).keys()),
-                        "download_url": None,  # سيتم إنشاء ZIP لاحقاً
-                        "files": files_data.get("files", {})
+                        "files_generated": list(files.keys()),
+                        "message": f"Project '{project_name}' generated successfully"
                     }
             
             st.error("❌ فشل في تحليل الرد من Gemini")
             return None
-                
+            
         except Exception as e:
             st.error(f"❌ خطأ في الاتصال: {e}")
             return None
 
-# ========== دالة توليد المشروع عبر المحرك المحلي ==========
+# ========== دالة توليد المشروع محلياً ==========
 def generate_via_local(project_name, description, template, auto_run, max_attempts):
     """توليد مشروع باستخدام المحرك المحلي"""
     
-    with st.spinner("💻 جاري التوليد محلياً... (قد يستغرق 30-60 ثانية)"):
+    with st.spinner("💻 جاري التوليد محلياً... (30-60 ثانية)"):
         try:
             af = AgentForgeOrchestrator()
-            
-            # إنشاء المجلد إذا لم يكن موجوداً
-            if not os.path.exists("projects"):
-                os.makedirs("projects")
-            
-            project_path = os.path.join("projects", project_name)
-            if not os.path.exists(project_path):
-                os.makedirs(project_path)
+            os.makedirs("projects", exist_ok=True)
+            os.makedirs(os.path.join("projects", project_name), exist_ok=True)
             
             state = af.start_cycle(
                 project_name=project_name,
@@ -244,154 +111,110 @@ def generate_via_local(project_name, description, template, auto_run, max_attemp
                 template=template
             )
             
-            return state
-            
+            if state.get("status") == "completed":
+                # إنشاء ZIP
+                shutil.make_archive(f"projects/{project_name}", 'zip', f"projects/{project_name}")
+                return {
+                    "success": True,
+                    "project_id": project_name,
+                    "files_generated": state.get("files", []),
+                    "message": f"Project '{project_name}' generated successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": state.get("reason", "Unknown error")
+                }
+                
         except Exception as e:
             st.error(f"❌ فشل التوليد المحلي: {e}")
-            return {"status": "failed", "reason": str(e)}
+            return {"success": False, "message": str(e)}
 
-# ========== واجهة المستخدم الرئيسية ==========
+# ========== الواجهة الرئيسية ==========
 st.title("🚀 AgentForge AI Engine")
-st.subheader("محرك بناء البرمجيات الذكي - الإصدار 1.0")
+st.subheader("محرك بناء البرمجيات الذكي - الإصدار 2.0")
 
-# عرض بطاقة توضيحية حسب طريقة التشغيل المختارة
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.markdown("""
-    **حوّل أفكارك إلى تطبيقات كاملة بضغطة زر!**  
-    اكتب وصفاً بسيطاً لمشروعك، وسيتولى الذكاء الاصطناعي بناءه بالكامل.
-    """)
-with col2:
+# القائمة الجانبية
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/1698/1698535.png", width=80)
+    st.title("AgentForge 🤖")
+    
+    st.markdown("---")
+    st.markdown("## ⚙️ طريقة التشغيل")
+    
+    execution_mode = st.radio(
+        "اختر الطريقة المناسبة لك:",
+        options=["☁️ **السحابي (Cloud API)**", "💻 **محلي (Local Engine)**"],
+        help="""
+        - ☁️ السحابي: يعمل فوراً، لا تحتاج تثبيت، مناسب للتجربة
+        - 💻 المحلي: يشغل المحرك على جهازك، مناسب للمطورين
+        """
+    )
+    
+    st.markdown("---")
+    
+    # إعدادات حسب الوضع
+    auto_run = True
+    max_attempts = 3
+    
+    if "محلي" in execution_mode:
+        auto_run = st.checkbox("تشغيل الكود تلقائياً", value=True)
+        max_attempts = st.slider("محاولات التصحيح", 1, 5, 3)
+    
     if "سحابي" in execution_mode:
-        st.success("☁️ **وضع السحاب**\nيعمل فوراً، بدون تثبيت")
-    else:
-        st.info("💻 **وضع محلي**\nيشغل المحرك على جهازك")
+        st.info("☁️ **وضع السحاب مفعل**")
+        st.caption("✅ يستخدم Gemini API")
+        st.caption("⚡ سريع - يعمل فوراً")
 
-st.markdown("---")
-
-# ========== إدخال بيانات المشروع ==========
+# إدخال بيانات المشروع
 col1, col2 = st.columns(2)
 with col1:
-    project_name = st.text_input("🏷️ **اسم المشروع**", placeholder="مثلاً: Pharmacy_System")
+    project_name = st.text_input("🏷️ **اسم المشروع**", placeholder="مثلاً: My_App")
 with col2:
     st.caption("استخدم أسماء إنجليزية بدون مسافات")
 
 project_desc = st.text_area(
-    "📝 **وصف المشروع**", 
-    placeholder="مثال: تطبيق إدارة مهام بسيط مع Streamlit. يحتوي على: إضافة مهمة، عرض المهام، حذف مهمة...",
-    height=150
+    "📝 **وصف المشروع**",
+    placeholder="مثال: Simple calculator app with basic operations",
+    height=100
 )
 
-# ========== زر التشغيل حسب الطريقة المختارة ==========
-if st.button("🚀 **إطلاق عملية التصميم (Forge)**", type="primary", use_container_width=True):
+# زر التوليد
+if st.button("🚀 **إطلاق عملية التصميم**", type="primary", use_container_width=True):
     
     if not project_name or not project_desc:
         st.warning("⚠️ رجاءً أدخل اسم المشروع ووصفه!")
     else:
         clean_name = project_name.replace(" ", "_")
+        result = None
         
-        # التشغيل حسب اختيار المستخدم
         if "سحابي" in execution_mode:
-            # ========== وضع السحاب ==========
-            result = generate_via_cloud(clean_name, project_desc, selected_template_value)
-            
-            if result and result.get("success"):
-                st.success(f"🎉 تم بناء المشروع: {clean_name}")
-                
-                # تسجيل النجاح في Google Sheets
-                log_to_sheets(clean_name, "Completed ✅", len(result.get("files_generated", [])), 0)
-                
-                # عرض رابط التحميل
-                st.info(f"📥 المشروع جاهز للتحميل: [اضغط هنا]({result.get('download_url')})")
-                
-                # عرض الملفات المنتجة
-                if result.get("files_generated"):
-                    st.subheader("📂 الملفات المنتجة:")
-                    for file in result["files_generated"]:
-                        st.code(f"✅ {file}")
-                        
-            else:
-                st.error("❌ فشل التوليد عبر السحاب. جرب الوضع المحلي بدلاً من ذلك.")
-                log_to_sheets(clean_name, "Failed ❌", 0, 0)
+            result = generate_via_cloud(clean_name, project_desc, "auto")
+        else:
+            result = generate_via_local(clean_name, project_desc, "auto", auto_run, max_attempts)
         
-        else:
-            # ========== وضع محلي ==========
-            state = generate_via_local(clean_name, project_desc, selected_template_value, auto_run, max_attempts)
+        # عرض النتيجة
+        if result and result.get("success"):
+            st.success(f"🎉 {result.get('message')}")
             
-            if state.get("status") == "completed":
-                st.success(f"🎉 تم بناء المشروع: {clean_name}")
-                
-                # تسجيل النجاح
-                file_count = len(state.get("files", []))
-                duration = state.get("duration", 0)
-                log_to_sheets(clean_name, "Completed ✅", file_count, duration)
-                
-                # إنشاء ZIP للتحميل
-                zip_file = create_zip(clean_name)
-                if zip_file and os.path.exists(zip_file):
-                    with open(zip_file, "rb") as fp:
-                        st.download_button(
-                            label=f"📥 تحميل {clean_name}.zip",
-                            data=fp,
-                            file_name=os.path.basename(zip_file),
-                            mime="application/zip"
-                        )
-                
-                # معاينة الملفات
-                st.info("📂 معاينة الملفات المنتجة:")
-                project_full_path = os.path.join("projects", clean_name)
-                if os.path.exists(project_full_path):
-                    files = [f for f in os.listdir(project_full_path) if os.path.isfile(os.path.join(project_full_path, f))]
-                    if files:
-                        tabs = st.tabs(files)
-                        for i, file in enumerate(files):
-                            with tabs[i]:
-                                with open(os.path.join(project_full_path, file), "r", encoding="utf-8") as f:
-                                    st.code(f.read(), language="python" if file.endswith(".py") else "text")
-            else:
-                st.error("❌ فشلت المهمة. راجع التفاصيل في الـ Logs.")
-                log_to_sheets(clean_name, "Failed ❌", 0, 0)
-
-# ========== إضافة صفحة التحميل ==========
-import streamlit as st
-import os
-import mimetypes
-
-def download_page():
-    """صفحة لتحميل الملفات"""
-    query_params = st.query_params
-    filename = query_params.get("file", [None])[0]
-    
-    if filename:
-        file_path = os.path.join("projects", filename)
-        if os.path.exists(file_path):
-            with open(file_path, "rb") as f:
-                st.download_button(
-                    label="📥 اضغط هنا لتحميل الملف",
-                    data=f,
-                    file_name=filename,
-                    mime="application/zip"
-                )
+            # زر التحميل
+            zip_path = f"projects/{clean_name}.zip"
+            if os.path.exists(zip_path):
+                with open(zip_path, "rb") as fp:
+                    st.download_button(
+                        label=f"📥 تحميل {clean_name}.zip",
+                        data=fp,
+                        file_name=f"{clean_name}.zip",
+                        mime="application/zip",
+                        use_container_width=True
+                    )
+            
+            # عرض الملفات المنتجة
+            with st.expander("📂 الملفات المنتجة"):
+                for file in result.get("files_generated", []):
+                    st.code(f"✅ {file}")
         else:
-            st.error("الملف غير موجود")
-    else:
-        st.info("لا يوجد ملف للتحميل")
+            st.error(f"❌ فشل التوليد: {result.get('message') if result else 'خطأ غير معروف'}")
 
-# في صفحة النجاح، بدلاً من رابط التحميل، استخدم زر download_button
-if result.get("success"):
-    st.success(f"🎉 تم بناء المشروع: {project_name}")
-    
-    # قراءة ملف ZIP
-    zip_path = f"projects/{project_name}.zip"
-    if os.path.exists(zip_path):
-        with open(zip_path, "rb") as fp:
-            st.download_button(
-                label=f"📥 تحميل {project_name}.zip",
-                data=fp,
-                file_name=f"{project_name}.zip",
-                mime="application/zip"
-            )
-
-# ========== تذييل الصفحة ==========
 st.markdown("---")
-st.caption("صُنع بكل حب بواسطة AgentForge - 2026")
+st.caption("صُنع بواسطة AgentForge - الإصدار 2.0")
