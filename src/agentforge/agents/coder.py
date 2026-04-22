@@ -207,79 +207,73 @@ class CoderAgent:
     def write_code(self, file_name, project_desc, task_details, history=None):
         """الواجهة الرئيسية - توليد الكود"""
         
-        # ✅ استخدام القوالب للملفات الأساسية (بغض النظر عن الوضع)
-        if self.templates:
-            # config.py
-            if file_name == "config.py":
-                logger.info(f"📄 Using template for {file_name}")
-                return self.templates.get_config_template()
-            
-            # database.py
-            if file_name == "database.py":
-                logger.info(f"📄 Using template for {file_name}")
-                return self.templates.get_database_template()
-            
-            # start_app.bat
-            if file_name == "start_app.bat":
-                logger.info(f"📄 Using template for {file_name}")
-                return self.templates.get_start_app_template()
-            
-            # helpers.py و main.py
-            if file_name in ["helpers.py", "main.py"]:
-                project_type = self.templates.detect_project_type(project_desc)
-                item_name = self.templates.detect_item_name(project_desc, project_type)
-                logger.info(f"📄 Using template for {file_name} (type: {project_type}, item: {item_name})")
-                
-                if file_name == "helpers.py":
-                    return self.templates.get_helpers_template(project_type, item_name)
-                if file_name == "main.py":
-                    return self.templates.get_main_template(project_type, item_name)
+        # ✅ إذا لم تكن القوالب موجودة، استخدم القوالب المدمجة
+        if self.templates is None:
+            from src.agentforge.smart_templates import SmartTemplates
+            self.templates = SmartTemplates()
+            logger.info("🔧 [DEBUG] Forced templates loading for cloud mode")
         
-        # ========== إذا لم يكن هناك قالب، استخدم AI ==========
-        # هذا الجزء لن يُستخدم الآن لأن القوالب تغطي كل الملفات الأساسية
+        # ✅ استخدام القوالب للملفات الأساسية (للوضعين معاً)
+        if file_name == "config.py":
+            return self.templates.get_config_template()
+        
+        if file_name == "database.py":
+            return self.templates.get_database_template()
+        
+        if file_name == "start_app.bat":
+            return self.templates.get_start_app_template()
+        
+        if file_name in ["helpers.py", "main.py"]:
+            project_type = self.templates.detect_project_type(project_desc)
+            item_name = self.templates.detect_item_name(project_desc, project_type)
+            logger.info(f"📄 Using template for {file_name} (type: {project_type})")
+            
+            if file_name == "helpers.py":
+                return self.templates.get_helpers_template(project_type, item_name)
+            if file_name == "main.py":
+                return self.templates.get_main_template(project_type, item_name)
+        
+        # ========== فقط للملفات غير الأساسية، استخدم AI ==========
         if self.use_local:
             return self._generate_with_ollama(file_name, project_desc, task_details, history)
         else:
             return self._generate_with_gemini(file_name, project_desc, task_details, history)
-
-    # ==================== وضع Ollama المحلي ====================
-
-    def _generate_with_ollama(self, file_name, project_desc, task_details, history=None):
-        """توليد الكود باستخدام Ollama المحلي"""
-        
-        prompt = self._build_prompt(file_name, project_desc, task_details, history)
-        
-        payload = {
-            "model": self.model_name,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.1,
-                "max_tokens": 4096,
-                "top_p": 0.9
+        def _generate_with_ollama(self, file_name, project_desc, task_details, history=None):
+            """توليد الكود باستخدام Ollama المحلي"""
+            
+            prompt = self._build_prompt(file_name, project_desc, task_details, history)
+            
+            payload = {
+                "model": self.model_name,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.1,
+                    "max_tokens": 4096,
+                    "top_p": 0.9
+                }
             }
-        }
-        
-        try:
-            response = requests.post(self.ollama_url, json=payload, timeout=180)
-            result = response.json()
-            raw_text = result.get('response', '')
             
-            if not raw_text:
-                logger.error("Empty response from Ollama")
+            try:
+                response = requests.post(self.ollama_url, json=payload, timeout=180)
+                result = response.json()
+                raw_text = result.get('response', '')
+                
+                if not raw_text:
+                    logger.error("Empty response from Ollama")
+                    return self._get_fallback_code(file_name)
+                
+                return self._clean_code(raw_text)
+                
+            except requests.exceptions.ConnectionError:
+                logger.error("❌ Ollama not running! Please run 'ollama serve'")
                 return self._get_fallback_code(file_name)
-            
-            return self._clean_code(raw_text)
-            
-        except requests.exceptions.ConnectionError:
-            logger.error("❌ Ollama not running! Please run 'ollama serve'")
-            return self._get_fallback_code(file_name)
-        except requests.exceptions.Timeout:
-            logger.error("❌ Ollama timeout - model may be loading or too slow")
-            return self._get_fallback_code(file_name)
-        except Exception as e:
-            logger.error(f"❌ Ollama error: {e}")
-            return self._get_fallback_code(file_name)
+            except requests.exceptions.Timeout:
+                logger.error("❌ Ollama timeout - model may be loading or too slow")
+                return self._get_fallback_code(file_name)
+            except Exception as e:
+                logger.error(f"❌ Ollama error: {e}")
+                return self._get_fallback_code(file_name)
 
     # ==================== وضع Gemini السحابي ====================
     
