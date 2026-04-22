@@ -8,4 +8,5 @@ gspread
 google-auth
 st-gsheets-connection
 ollama
-sqlalchemy
+sqlalchemy>=2.0.0
+
