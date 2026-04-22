@@ -12,6 +12,7 @@ from src.agentforge.agents.executor import ExecutorAgent
 from src.agentforge.agents.reviewer import Reviewer
 from src.agentforge.agents.tester import TesterAgent
 from src.agentforge.agents.memory import MemoryAgent
+
 # إعدادات الطباعة والسجل
 sys.stdout.reconfigure(encoding='utf-8')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,22 +26,24 @@ class AgentForgeOrchestrator:
         use_local = None  → اكتشف تلقائياً
         """
         
-        # كشف البيئة تلقائياً
-        from detect_env import get_engine_type
-        engine = get_engine_type()
-        
+         # كشف البيئة
         if use_local is None:
-            use_local = (engine["environment"] == "local")
+            use_local = self._detect_local_environment()
         
         self.use_local = use_local
-        
+         # ✅ إنشاء القوالب أولاً
+        from src.agentforge.smart_templates import SmartTemplates
+        self.templates = SmartTemplates()
         # تهيئة الوكلاء مع المحرك المناسب
         self.memory = MemoryAgent()
         self.architect = ArchitectAgent(use_local=use_local)
-        self.coder = CoderAgent(memory=self.memory, use_local=use_local)
+        self.coder = CoderAgent(memory=self.memory, use_local=use_local, templates=self.templates)  # ← أضف templates
         self.tester = TesterAgent()
         self.executor = ExecutorAgent()
         self.reviewer = Reviewer(use_local=use_local)
+        
+        
+        
         self.history = []
         self.project_state = {
             "name": "",
@@ -91,6 +94,7 @@ class AgentForgeOrchestrator:
         self.project_state["language"] = lang
         self.project_state["auto_run"] = auto_run
         self.project_state["max_attempts"] = max_attempts
+        
         # 1. جلب القواعد والذاكرة لتعزيز المناعة
         gui_rules = self._load_gui_rules() # جلب الدستور البرمجي
         memory_context = self.memory.get_context_for_coder()
@@ -107,7 +111,10 @@ class AgentForgeOrchestrator:
 
         # حقن مفتاح الـ API في المشروع الجديد
         self._inject_env_file(project_path)
-
+        
+        if hasattr(self, 'templates'):
+            self.coder.set_templates(self.templates)
+            logger.info("📚 Smart templates loaded into CoderAgent")
         # مخزن الأكواد المعتمدة لضمان التكامل
         approved_codes = {} 
 
