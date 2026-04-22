@@ -73,7 +73,7 @@ class CoderAgent:
     def write_code(self, file_name, project_desc, task_details, history=None):
         """الواجهة الرئيسية - توليد الكود"""
         
-        # ========== استخدام القوالب للملفات الأساسية ==========
+        # ✅ استخدام القوالب للملفات الأساسية (بغض النظر عن الوضع)
         if self.templates:
             # config.py
             if file_name == "config.py":
@@ -102,6 +102,7 @@ class CoderAgent:
                     return self.templates.get_main_template(project_type, item_name)
         
         # ========== إذا لم يكن هناك قالب، استخدم AI ==========
+        # هذا الجزء لن يُستخدم الآن لأن القوالب تغطي كل الملفات الأساسية
         if self.use_local:
             return self._generate_with_ollama(file_name, project_desc, task_details, history)
         else:
