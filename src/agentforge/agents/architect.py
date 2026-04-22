@@ -6,6 +6,8 @@ import json
 import requests
 import logging
 from dotenv import load_dotenv
+from src.agentforge.smart_templates import SmartTemplates
+
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -62,6 +64,7 @@ class ArchitectAgent:
           "start_app.bat": "streamlit run main.py"
         }
         """
+        self.templates = SmartTemplates()  # ✅ أضف هذا السطر
 
     def _detect_local_environment(self):
         """كشف تلقائي إذا كان Ollama متاحاً محلياً"""
@@ -84,6 +87,10 @@ class ArchitectAgent:
         """الواجهة الرئيسية - تصميم هيكل المشروع"""
         logger.info(f"🧠 Architect designing project: {name}...")
 
+        # ✅ كشف نوع المشروع باستخدام القوالب
+        project_type = self.templates.detect_project_type(description)
+        item_name = self.templates.detect_item_name(description, project_type)
+        
         if self.use_local:
             return self._design_with_ollama(name, description)
         else:

@@ -89,7 +89,12 @@ streamlit run main.py
 pause
 '''
         }
-
+        self.templates = None  # ✅ أضف هذا السطر
+    def set_templates(self, templates):
+        """تعيين القوالب الذكية"""
+        self.templates = templates
+        if self.templates:
+            logger.info("✅ Smart templates loaded into CoderAgent")
     def _detect_local_environment(self):
         """كشف تلقائي إذا كان Ollama متاحاً محلياً"""
         try:
@@ -111,7 +116,25 @@ pause
 
     def write_code(self, file_name, project_desc, task_details, history=None):
         """الواجهة الرئيسية - توزع العمل حسب الوضع"""
-        
+        if self.templates:
+            if file_name == "config.py":
+                return self.templates.get_config_template()
+            
+            if file_name == "database.py":
+                return self.templates.get_database_template()
+            
+            if file_name == "start_app.bat":
+                return self.templates.get_start_app_template()
+            
+            if file_name in ["helpers.py", "main.py"]:
+                project_type = self.templates.detect_project_type(project_desc)
+                item_name = self.templates.detect_item_name(project_desc, project_type)
+                
+                if file_name == "helpers.py":
+                    return self.templates.get_helpers_template(project_type, item_name)
+                if file_name == "main.py":
+                    return self.templates.get_main_template(project_type, item_name)
+
         # استخدام القالب الجاهز إذا كان موجوداً
         if file_name in self.templates:
             logger.info(f"📄 Using template for {file_name}")
@@ -122,7 +145,7 @@ pause
             return self._generate_with_ollama(file_name, project_desc, task_details, history)
         else:
             return self._generate_with_gemini(file_name, project_desc, task_details, history)
-
+        
     # ==================== وضع Ollama المحلي ====================
 
     def _generate_with_ollama(self, file_name, project_desc, task_details, history=None):

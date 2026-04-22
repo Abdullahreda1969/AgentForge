@@ -171,7 +171,7 @@ def generate_via_local(project_name, description, template, auto_run, max_attemp
     
     with st.spinner("💻 جاري التوليد محلياً..."):
         try:
-            af = AgentForgeOrchestrator()
+            af = AgentForgeOrchestrator(use_local=True)
             os.makedirs("projects", exist_ok=True)
             os.makedirs(os.path.join("projects", project_name), exist_ok=True)
             
@@ -185,6 +185,7 @@ def generate_via_local(project_name, description, template, auto_run, max_attemp
             )
             
             if state.get("status") == "completed":
+                import shutil
                 shutil.make_archive(f"projects/{project_name}", 'zip', f"projects/{project_name}")
                 return {
                     "success": True,
@@ -201,6 +202,7 @@ def generate_via_local(project_name, description, template, auto_run, max_attemp
         except Exception as e:
             st.error(f"❌ فشل التوليد المحلي: {e}")
             return {"success": False, "message": str(e)}
+
 
 # ========== الواجهة الرئيسية ==========
 st.title("🚀 AgentForge AI Engine")
