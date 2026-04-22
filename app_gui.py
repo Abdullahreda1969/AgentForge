@@ -31,7 +31,7 @@ except:
     st.sidebar.error("❌ No secrets found")
 # ========== دالة توليد المشروع عبر السحاب ==========
 def generate_via_cloud(project_name, description, template):
-    """توليد مشروع باستخدام Gemini API مباشرة"""
+    """توليد مشروع باستخدام API السحابي"""
     
     # الحصول على المفتاح
     try:
@@ -43,78 +43,48 @@ def generate_via_cloud(project_name, description, template):
         st.error("❌ مفتاح Gemini API غير متوفر")
         return None
     
-    GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key={API_KEY}"
-    
-    with st.spinner("☁️ جاري التوليد..."):
+    with st.spinner("☁️ جاري التوليد على السحاب..."):
         try:
-            # ✅ بناء prompt بسيط وواضح
-            prompt = f"""Create a complete Streamlit application.
-
-User request: {description}
-Project name: {project_name}
-
-Requirements:
-1. Generate 4 files: main.py, config.py, helpers.py, start_app.bat
-2. main.py must contain the full Streamlit UI
-3. helpers.py must contain business logic
-4. config.py for configuration
-5. start_app.bat to run the app
-
-Return ONLY valid JSON. Example format:
-{{"files": {{"main.py": "code", "config.py": "code", "helpers.py": "code", "start_app.bat": "code"}}}}"""
+            # ✅ استخدام orchestrator الموحد (نفس الوضع المحلي)
+            # ولكن مع use_local=False لاستخدام Gemini
+            af = AgentForgeOrchestrator(use_local=False)
             
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.2,
-                    "maxOutputTokens": 4096
-                }
-            }
+            # ✅ تمرير القوالب (مهم جداً)
+            if hasattr(af, 'templates'):
+                af.coder.set_templates(af.templates)
             
-            response = requests.post(GEMINI_URL, json=payload, timeout=90)
-            result = response.json()
+            os.makedirs("projects", exist_ok=True)
             
-            # طباعة للتصحيح (ستظهر في logs)
-            print(f"Gemini Response: {result}")
+            state = af.start_cycle(
+                project_name=project_name,
+                description=description,
+                template=template
+            )
             
-            if "candidates" in result and len(result["candidates"]) > 0:
-                raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
+            if state.get("status") == "completed":
+                # إنشاء ZIP
+                import shutil
+                shutil.make_archive(f"projects/{project_name}", 'zip', f"projects/{project_name}")
                 
-                # استخراج JSON
-                json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-                if json_match:
-                    data = json.loads(json_match.group())
-                    files = data.get("files", {})
-                    
-                    # إنشاء المشروع
-                    project_path = os.path.join("projects", project_name)
-                    os.makedirs(project_path, exist_ok=True)
-                    
-                    for filename, code in files.items():
-                        with open(os.path.join(project_path, filename), "w", encoding="utf-8") as f:
-                            f.write(code)
-                    
-                    # إضافة start_app.bat إذا لم يكن موجوداً
-                    bat_path = os.path.join(project_path, "start_app.bat")
-                    if not os.path.exists(bat_path):
-                        with open(bat_path, "w") as f:
-                            f.write("@echo off\nstreamlit run main.py\npause")
-                    
-                    shutil.make_archive(f"projects/{project_name}", 'zip', project_path)
-                    
-                    return {
-                        "success": True,
-                        "project_id": project_name,
-                        "files_generated": list(files.keys()),
-                        "message": f"✅ {project_name} created successfully"
-                    }
-            
-            # إذا فشل Gemini، استخدم القالب العام
-            return generate_fallback_project(project_name, description)
-            
+                # قراءة الملفات المنتجة
+                project_path = os.path.join("projects", project_name)
+                files = os.listdir(project_path) if os.path.exists(project_path) else []
+                
+                return {
+                    "success": True,
+                    "project_id": project_name,
+                    "files_generated": files,
+                    "message": f"Project '{project_name}' generated successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": state.get("reason", "Unknown error")
+                }
+                
         except Exception as e:
-            st.warning(f"⚠️ Gemini error: {e}")
-            return generate_fallback_project(project_name, description)
+            st.error(f"❌ خطأ في التوليد السحابي: {e}")
+            return {"success": False, "message": str(e)}
 
 def generate_fallback_project(project_name, description):
     """قالب عام عندما يفشل Gemini"""

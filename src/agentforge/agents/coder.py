@@ -147,7 +147,11 @@ class CoderAgent:
             return self._get_fallback_code(file_name)
 
     # ==================== وضع Gemini السحابي ====================
-
+    def set_templates(self, templates):
+        """تعيين القوالب الذكية"""
+        self.templates = templates
+        if self.templates:
+            logger.info("✅ Smart templates loaded into CoderAgent")
     def _generate_with_gemini(self, file_name, project_desc, task_details, history=None):
         """توليد الكود باستخدام Gemini API"""
         
