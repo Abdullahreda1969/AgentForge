@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 logger = logging.getLogger("AgentForge.Coder")
 load_dotenv()
 # ========== القوالب الذكية المدمجة ==========
+# ========== القوالب المدمجة (Built-in Templates) ==========
 class BuiltInTemplates:
-    """قوالب مدمجة في coder.py - لا تعتمد على استيراد خارجي"""
+    """قوالب مدمجة - نفس السلوك للوضعين المحلي والسحابي"""
     
     @staticmethod
     def get_config_template():
@@ -27,17 +28,21 @@ DEBUG = os.getenv("DEBUG", "False").lower() == "true"
     @staticmethod
     def get_database_template():
         return '''# database.py
-# Simple in-memory storage
+# Simple in-memory storage (no SQLAlchemy needed)
 _items = []
+_next_id = 1
 
-def get_items():
+def get_all():
     return _items
 
-def add_item(item):
+def add(item):
+    global _next_id
+    item["id"] = _next_id
     _items.append(item)
+    _next_id += 1
     return item
 
-def delete_item(item_id):
+def delete(item_id):
     global _items
     _items = [i for i in _items if i.get("id") != item_id]
     return True
@@ -52,12 +57,6 @@ _next_id = 1
 
 def get_{items_name}():
     return _items
-
-def get_{item_name}_by_id({item_name}_id):
-    for item in _items:
-        if item.get("id") == {item_name}_id:
-            return item
-    return None
 
 def add_{item_name}(name: str, description: str = ""):
     global _next_id
@@ -109,6 +108,8 @@ else:
         col1, col2 = st.columns([3, 1])
         with col1:
             st.write(f"**{{item.get('name')}}**")
+            if item.get("description"):
+                st.caption(item.get("description"))
         with col2:
             if st.button("Delete", key=item.get("id")):
                 delete_{item_name}(item.get("id"))
@@ -122,15 +123,23 @@ else:
     @staticmethod
     def detect_project_type(description):
         desc_lower = description.lower()
-        if any(w in desc_lower for w in ['task', 'مهمة']): return "task"
-        if any(w in desc_lower for w in ['contact', 'جهة', 'عنوان']): return "contact"
-        if any(w in desc_lower for w in ['product', 'منتج']): return "product"
+        if any(w in desc_lower for w in ['contact', 'address', 'phone', 'جهة', 'عنوان', 'دفتر']):
+            return "contact"
+        if any(w in desc_lower for w in ['task', 'todo', 'reminder', 'مهمة', 'مهام', 'تذكير']):
+            return "task"
+        if any(w in desc_lower for w in ['product', 'inventory', 'منتج', 'مخزون']):
+            return "product"
         return "general"
     
     @staticmethod
     def detect_item_name(description, project_type):
-        names = {"task": "task", "contact": "contact", "product": "product"}
-        return names.get(project_type, "item")
+        if project_type == "contact":
+            return "contact"
+        if project_type == "task":
+            return "task"
+        if project_type == "product":
+            return "product"
+        return "item"
 
 class CoderAgent:
     def __init__(self, memory=None, use_local=None, templates=None):
@@ -207,13 +216,18 @@ class CoderAgent:
     def write_code(self, file_name, project_desc, task_details, history=None):
         """الواجهة الرئيسية - توليد الكود"""
         
-        # ✅ إذا لم تكن القوالب موجودة، استخدم القوالب المدمجة
+        # ✅ الخطوة 1: تأكد من وجود القوالب (للوضعين معاً)
         if self.templates is None:
-            from src.agentforge.smart_templates import SmartTemplates
-            self.templates = SmartTemplates()
-            logger.info("🔧 [DEBUG] Forced templates loading for cloud mode")
+            try:
+                from src.agentforge.smart_templates import SmartTemplates
+                self.templates = SmartTemplates()
+                logger.info("✅ Templates loaded for both modes")
+            except ImportError:
+                # إذا لم نجد smart_templates، استخدم القوالب المدمجة
+                self.templates = BuiltInTemplates()
+                logger.info("✅ Built-in templates loaded")
         
-        # ✅ استخدام القوالب للملفات الأساسية (للوضعين معاً)
+        # ✅ الخطوة 2: استخدم القوالب لجميع الملفات الأساسية (نفس السلوك للوضعين)
         if file_name == "config.py":
             return self.templates.get_config_template()
         
@@ -226,14 +240,15 @@ class CoderAgent:
         if file_name in ["helpers.py", "main.py"]:
             project_type = self.templates.detect_project_type(project_desc)
             item_name = self.templates.detect_item_name(project_desc, project_type)
-            logger.info(f"📄 Using template for {file_name} (type: {project_type})")
+            logger.info(f"📄 Generating {file_name} using templates (type: {project_type})")
             
             if file_name == "helpers.py":
                 return self.templates.get_helpers_template(project_type, item_name)
             if file_name == "main.py":
                 return self.templates.get_main_template(project_type, item_name)
         
-        # ========== فقط للملفات غير الأساسية، استخدم AI ==========
+        # ✅ الخطوة 3: فقط للملفات غير المغطاة بالقوالب (نادراً ما يحدث)
+        logger.warning(f"⚠️ No template for {file_name}, using AI fallback")
         if self.use_local:
             return self._generate_with_ollama(file_name, project_desc, task_details, history)
         else:
