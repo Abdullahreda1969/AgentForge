@@ -1,5 +1,18 @@
 # app_gui.py - النسخة المصححة
 import streamlit as st
+# في بداية الملف، بعد import streamlit
+import subprocess
+import sys
+
+# تحقق من وجود sqlalchemy
+try:
+    import sqlalchemy
+    st.sidebar.success(f"✅ SQLAlchemy version: {sqlalchemy.__version__}")
+except ImportError:
+    st.sidebar.error("❌ SQLAlchemy NOT installed")
+    # جرب تثبيته
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "sqlalchemy"])
+    st.sidebar.info("🔄 SQLAlchemy installed, please reboot")
 import sys
 import os
 import requests
@@ -262,3 +275,18 @@ if st.button("🚀 **إطلاق عملية التصميم**", type="primary", us
 
 st.markdown("---")
 st.caption("صُنع بواسطة AgentForge - الإصدار 2.0")
+# صفحة تشخيص مؤقتة
+with st.expander("🔧 Diagnostic Info (click to expand)"):
+    st.code(f"""
+    Python version: {sys.version}
+    Current directory: {os.getcwd()}
+    Files in src/agentforge/: {os.listdir('src/agentforge') if os.path.exists('src/agentforge') else 'Not found'}
+    """)
+    
+    # اختبار استيراد smart_templates
+    try:
+        from src.agentforge.smart_templates import SmartTemplates
+        st.success("✅ SmartTemplates imported successfully")
+        st.code(f"Methods: {[m for m in dir(SmartTemplates) if not m.startswith('_')]}")
+    except ImportError as e:
+        st.error(f"❌ Cannot import SmartTemplates: {e}")

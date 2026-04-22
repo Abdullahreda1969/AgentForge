@@ -7,7 +7,130 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger("AgentForge.Coder")
 load_dotenv()
+# ========== القوالب الذكية المدمجة ==========
+class BuiltInTemplates:
+    """قوالب مدمجة في coder.py - لا تعتمد على استيراد خارجي"""
+    
+    @staticmethod
+    def get_config_template():
+        return '''# config.py
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
+APP_NAME = "My Application"
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+'''
+    
+    @staticmethod
+    def get_database_template():
+        return '''# database.py
+# Simple in-memory storage
+_items = []
+
+def get_items():
+    return _items
+
+def add_item(item):
+    _items.append(item)
+    return item
+
+def delete_item(item_id):
+    global _items
+    _items = [i for i in _items if i.get("id") != item_id]
+    return True
+'''
+    
+    @staticmethod
+    def get_helpers_template(project_type, item_name):
+        items_name = f"{item_name}s"
+        return f'''# helpers.py
+_items = []
+_next_id = 1
+
+def get_{items_name}():
+    return _items
+
+def get_{item_name}_by_id({item_name}_id):
+    for item in _items:
+        if item.get("id") == {item_name}_id:
+            return item
+    return None
+
+def add_{item_name}(name: str, description: str = ""):
+    global _next_id
+    item = {{"id": _next_id, "name": name, "description": description}}
+    _items.append(item)
+    _next_id += 1
+    return item
+
+def delete_{item_name}({item_name}_id: int):
+    global _items
+    _items = [i for i in _items if i.get("id") != {item_name}_id]
+    return True
+'''
+    
+    @staticmethod
+    def get_main_template(project_type, item_name):
+        items_name = f"{item_name}s"
+        titles = {"task": "Task Manager", "contact": "Contact Book", "product": "Inventory"}
+        title = titles.get(project_type, f"{item_name.title()} Manager")
+        
+        return f'''# main.py
+import streamlit as st
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(__file__))
+
+from helpers import get_{items_name}, add_{item_name}, delete_{item_name}
+
+st.set_page_config(page_title="{title}", layout="wide")
+st.title(f"{title}")
+
+with st.sidebar:
+    st.header(f"Add New {item_name.title()}")
+    with st.form("add_form"):
+        name = st.text_input(f"{item_name.title()} Name")
+        description = st.text_area("Description")
+        if st.form_submit_button("Add"):
+            add_{item_name}(name=name, description=description)
+            st.rerun()
+
+st.header(f"{items_name.title()} List")
+items = get_{items_name}()
+
+if not items:
+    st.info(f"No {items_name} yet")
+else:
+    for item in items:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write(f"**{{item.get('name')}}**")
+        with col2:
+            if st.button("Delete", key=item.get("id")):
+                delete_{item_name}(item.get("id"))
+                st.rerun()
+'''
+    
+    @staticmethod
+    def get_start_app_template():
+        return '@echo off\nstreamlit run main.py\npause'
+    
+    @staticmethod
+    def detect_project_type(description):
+        desc_lower = description.lower()
+        if any(w in desc_lower for w in ['task', 'مهمة']): return "task"
+        if any(w in desc_lower for w in ['contact', 'جهة', 'عنوان']): return "contact"
+        if any(w in desc_lower for w in ['product', 'منتج']): return "product"
+        return "general"
+    
+    @staticmethod
+    def detect_item_name(description, project_type):
+        names = {"task": "task", "contact": "contact", "product": "product"}
+        return names.get(project_type, "item")
 
 class CoderAgent:
     def __init__(self, memory=None, use_local=None, templates=None):
@@ -17,6 +140,13 @@ class CoderAgent:
         templates: SmartTemplates للقوالب الذكية
         """
         self.memory = memory
+        # ✅ إذا لم تمرر قوالب، استخدم القوالب المدمجة
+        if templates is None:
+            self.templates = BuiltInTemplates()
+            logger.info("📚 Using built-in templates")
+        else:
+            self.templates = templates
+            logger.info("📚 Using external templates")
         self.templates = templates
         
         # كشف البيئة إذا لم يحدد المستخدم

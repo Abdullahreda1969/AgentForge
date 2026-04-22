@@ -12,6 +12,7 @@ from src.agentforge.agents.executor import ExecutorAgent
 from src.agentforge.agents.reviewer import Reviewer
 from src.agentforge.agents.tester import TesterAgent
 from src.agentforge.agents.memory import MemoryAgent
+from src.agentforge.smart_templates import SmartTemplates
 
 # إعدادات الطباعة والسجل
 sys.stdout.reconfigure(encoding='utf-8')
